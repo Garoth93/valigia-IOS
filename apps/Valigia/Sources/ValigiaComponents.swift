@@ -79,41 +79,44 @@ struct CheckControl: View {
     }
 }
 
-// MARK: - Bag visuals (architecture for phase 2)
+// MARK: - Bag visuals
 
 /// A view that draws a bag from its fill state and reacts to packing events.
-/// Phase 2 adds `IllustratedLuggageVisual` (SwiftUI suitcase with springs,
-/// lid, zipper, Reduce Motion) and `ThreeDLuggageVisual` (SceneKit/RealityKit)
-/// conforming to this same protocol; `LuggageVisualView` picks one from settings.
+/// Implementations: `SimpleLuggageVisual` (icon + ring) and `ThreeDLuggageVisual`
+/// (RealityKit). The illustrated SwiftUI suitcase will conform to the same protocol.
+/// `eventID` changes with every new batch of events (even identical ones).
 protocol LuggageVisual: View {
-    init(state: LuggageFillState, lastEvents: [PackingEvent], size: CGFloat)
+    init(state: LuggageFillState, lastEvents: [PackingEvent], eventID: UUID?, size: CGFloat)
 }
 
-/// Picks the visual chosen in Settings (only the simple one exists today).
+/// Picks the visual chosen in Settings. The 3D suitcase is used only where
+/// there is room for it (`allowsLarge`, the header of a bag); small places
+/// (cards) always use the simple icon, so only one 3D view renders at a time.
 struct LuggageVisualView: View {
     @Environment(AppModel.self) private var model
     let state: LuggageFillState
     var tripID: UUID?
     var size: CGFloat = 64
+    var allowsLarge = false
+
+    static func usesLarge(_ style: LuggageVisualStyle, allowsLarge: Bool) -> Bool {
+        allowsLarge && style == .threeD
+    }
 
     var body: some View {
-        let events = relevantEvents
-        switch model.data.settings.visualStyle {
-        case .simple, .illustrated, .threeD:
-            SimpleLuggageVisual(state: state, lastEvents: events, size: size)
+        let batch = model.events.lastBatch
+        let events = relevantEvents(batch)
+        if Self.usesLarge(model.data.settings.visualStyle, allowsLarge: allowsLarge) {
+            ThreeDLuggageVisual(state: state, lastEvents: events, eventID: events.isEmpty ? nil : batch?.id, size: size)
+        } else {
+            SimpleLuggageVisual(state: state, lastEvents: events, eventID: batch?.id, size: size)
         }
     }
 
     /// Events of the last batch that concern this bag (or the whole round).
-    private var relevantEvents: [PackingEvent] {
-        guard let batch = model.events.lastBatch, batch.tripID == tripID else { return [] }
-        return batch.events.filter { e in
-            switch e {
-            case .itemChecked(_, let l, _), .itemUnchecked(_, let l, _), .itemFlagged(_, let l, _): return l == state.luggageID
-            case .luggageClosed(let l), .luggageEmptied(let l): return l == state.luggageID
-            case .roundCompleted, .returnRoundEmptied: return true
-            }
-        }
+    private func relevantEvents(_ batch: PackingEventCenter.Batch?) -> [PackingEvent] {
+        guard let batch, batch.tripID == tripID else { return [] }
+        return batch.events.filter { $0.luggageID == nil || $0.luggageID == state.luggageID }
     }
 }
 
@@ -122,11 +125,13 @@ struct SimpleLuggageVisual: LuggageVisual {
     @Environment(\.m3) private var m3
     let state: LuggageFillState
     let lastEvents: [PackingEvent]
+    let eventID: UUID?
     let size: CGFloat
 
-    init(state: LuggageFillState, lastEvents: [PackingEvent], size: CGFloat) {
+    init(state: LuggageFillState, lastEvents: [PackingEvent], eventID: UUID?, size: CGFloat) {
         self.state = state
         self.lastEvents = lastEvents
+        self.eventID = eventID
         self.size = size
     }
 

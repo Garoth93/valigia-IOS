@@ -81,22 +81,31 @@ quello rovinato. Scelto al posto di SwiftData perché tutta la logica (e la
 persistenza) sta nel package `ValigiaCore`, testabile anche su Linux. Le foto
 sono JPEG ridotti in Application Support/Photos.
 
-## Animazioni (fase 2) — architettura già pronta
+## Valigia 3D e animazioni
 
-La valigia è una vista separata che riceve solo dati:
+In **Impostazioni › Controllo › Valigia** scegli come vedere il contenitore:
+
+- **Semplice**: icona con anello di avanzamento (default).
+- **3D**: in cima alla lista di ogni contenitore di un viaggio compare una
+  valigia 3D generata da codice (RealityKit, nessun modello esterno). La ruoti
+  col dito (doppio tocco per raddrizzarla); le voci spuntate ci volano dentro
+  (o escono nei giri «Svuota»), il contenuto sale con il riempimento e diventa
+  rosso oltre il peso massimo, a 100% il coperchio si chiude e la cerniera
+  scorre. Con «Riduci movimento» niente pacchi in volo e coperchio senza
+  animazione. Nelle schede (dettaglio viaggio) resta l'icona semplice, così è
+  attiva una sola vista 3D alla volta.
+- **Illustrata** (SwiftUI, fase successiva): in arrivo.
+
+Architettura: la valigia è una vista separata che riceve solo dati.
 
 - `LuggageFillState` (package): avanzamento, `fillLevel` (sale riempiendo,
-  scende svuotando), peso / peso massimo, `isClosed` (100% in partenza),
-  `isEmptied` (100% al ritorno).
-- `PackingEvent` (package, calcolati da `PackingEvents.diff`): voce
-  spuntata/tolta (con direzione), voce segnalata, contenitore chiuso/svuotato,
-  giro completato, giro di ritorno svuotato.
-- Nell'app `PackingEventCenter` pubblica gli eventi (`lastBatch` osservabile e
-  `stream()` asincrono); il protocollo `LuggageVisual` e `LuggageVisualView`
-  scelgono la vista da Impostazioni (`Semplice` oggi; `Illustrata` e `3D`
-  sono già nel modello, "in arrivo").
-
-Per ora: icona del contenitore con anello di avanzamento e barre del peso.
+  scende svuotando), peso / peso massimo, `isClosed`, `isEmptied`.
+- `PackingEvent` (package, da `PackingEvents.diff`): voce spuntata/tolta,
+  segnalata, contenitore chiuso/svuotato, giro completato, giro di ritorno
+  svuotato; `motion` dice se la voce entra o esce.
+- Nell'app `PackingEventCenter` pubblica gli eventi (`lastBatch` osservabile
+  e `stream()` asincrono); il protocollo `LuggageVisual` e
+  `LuggageVisualView` scelgono la vista da Impostazioni.
 
 ## Integrazione con altre app (attrezzatura)
 

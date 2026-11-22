@@ -47,6 +47,7 @@ targets:
       - sdk: UserNotifications.framework
       - sdk: PhotosUI.framework
       - sdk: Charts.framework
+      - sdk: RealityKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.garoth93.valigia

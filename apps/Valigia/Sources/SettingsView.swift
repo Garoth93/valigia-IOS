@@ -63,7 +63,11 @@ struct SettingsView: View {
                     }
                 }
                 Toggle("Feedback tattile", isOn: Binding(get: { s.haptics }, set: { v in model.updateSettings { $0.haptics = v } }))
-            } header: { ListHeader(title: "Controllo") }
+            } header: { ListHeader(title: "Controllo") } footer: {
+                if s.visualStyle == .threeD {
+                    Text("Valigia 3D: la vedi in cima alla lista di ogni contenitore di un viaggio. Trascinala per ruotarla, tocca due volte per raddrizzarla; le voci spuntate ci volano dentro e a 100% il coperchio si chiude. Con «Riduci movimento» attivo le animazioni sono ridotte.")
+                }
+            }
             .listRowBackground(m3.surfaceContainerLow)
 
             Section {

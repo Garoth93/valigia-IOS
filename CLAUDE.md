@@ -102,6 +102,12 @@ App:
   swipe, menu, riordino, inserimento veloce) usata per viaggi, template e
   "sempre presenti", controllo rapido, fine giro, template, da comprare,
   statistiche (Swift Charts), impostazioni.
+- Visual del contenitore (`LuggageVisual`, scelto in Impostazioni):
+  `SimpleLuggageVisual` ovunque; `ThreeDLuggageVisual` (RealityKit,
+  `LuggageScene` generata da codice: scatola aperta, contenuto che sale,
+  coperchio con cerniera, pacchi che entrano/escono, rotazione col dito,
+  rispetta Riduci movimento) solo nell'intestazione di `LuggageView` dei
+  viaggi (`allowsLarge`). L'illustrata SwiftUI è ancora "in arrivo".
 - Widget `NextTripWidget` (small/medium + blocco), tocco →
   `valigia://trip/<uuid>`. App Group `group.com.garoth93.valigia`.
 

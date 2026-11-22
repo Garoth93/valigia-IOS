@@ -475,8 +475,8 @@ public enum Appearance: String, Codable, CaseIterable, Sendable {
     }
 }
 
-/// How the bag is drawn. Only `.simple` exists today; the others are the
-/// hooks for phase 2 (illustrated SwiftUI suitcase, 3D suitcase).
+/// How the bag is drawn: simple icon, 3D suitcase (RealityKit, generated in code)
+/// and, in a later phase, the illustrated SwiftUI suitcase.
 public enum LuggageVisualStyle: String, Codable, CaseIterable, Sendable {
     case simple, illustrated, threeD
 
@@ -488,7 +488,7 @@ public enum LuggageVisualStyle: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    public var isAvailable: Bool { self == .simple }
+    public var isAvailable: Bool { self != .illustrated }
 
     public init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)

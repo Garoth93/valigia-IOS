@@ -65,4 +65,17 @@ final class FillStateTests: XCTestCase {
         XCTAssertTrue(events.contains(.roundCompleted(roundID: ret)))
         XCTAssertEqual(events.last, .returnRoundEmptied(roundID: ret))
     }
+
+    func testMotionAndLuggageOfEvents() {
+        let i = UUID(), l = UUID(), r = UUID()
+        XCTAssertEqual(PackingEvent.itemChecked(itemID: i, luggageID: l, direction: .pack).motion, .enter)
+        XCTAssertEqual(PackingEvent.itemChecked(itemID: i, luggageID: l, direction: .unpack).motion, .exit)
+        XCTAssertEqual(PackingEvent.itemUnchecked(itemID: i, luggageID: l, direction: .pack).motion, .exit)
+        XCTAssertEqual(PackingEvent.itemUnchecked(itemID: i, luggageID: l, direction: .unpack).motion, .enter)
+        XCTAssertNil(PackingEvent.luggageClosed(luggageID: l).motion)
+        XCTAssertEqual(PackingEvent.itemFlagged(itemID: i, luggageID: l, status: .notFound).luggageID, l)
+        XCTAssertNil(PackingEvent.roundCompleted(roundID: r).luggageID)
+        XCTAssertTrue(LuggageVisualStyle.threeD.isAvailable)
+        XCTAssertFalse(LuggageVisualStyle.illustrated.isAvailable)
+    }
 }

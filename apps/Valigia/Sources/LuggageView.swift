@@ -149,10 +149,17 @@ struct LuggageView: View {
     private var header: some View {
         if let luggage {
             let state = LuggageFillState(luggage: luggage, round: round)
+            let large = isChecking && LuggageVisualView.usesLarge(model.data.settings.visualStyle, allowsLarge: true)
+            VStack(spacing: 6) {
+            if large {
+                LuggageVisualView(state: state, tripID: trip?.id, size: 230, allowsLarge: true)
+                    .background(m3.surfaceContainer, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
             HStack(alignment: .center, spacing: 16) {
-                if isChecking {
+                if isChecking && !large {
                     LuggageVisualView(state: state, tripID: trip?.id, size: 84)
-                } else {
+                } else if !isChecking {
                     IconBadge(icon: luggage.kind.symbol, tones: m3.tones(luggage.colorHex), size: 72, cookie: true)
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -174,9 +181,11 @@ struct LuggageView: View {
                     WeightGauge(grams: luggage.totalWeightGrams, maxGrams: luggage.maxWeightGrams)
                 }
             }
-            .padding(16)
-            .background(m3.surfaceContainerLow, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .contentShape(Rectangle())
             .onTapGesture { showLuggageEditor = true }
+            }
+            .padding(large ? 10 : 16)
+            .background(m3.surfaceContainerLow, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         } else if case .always = ref {
             Text("Queste voci vengono copiate in ogni nuovo viaggio (nel primo contenitore), se non ci sono già.")
                 .font(.m3BodyMedium)

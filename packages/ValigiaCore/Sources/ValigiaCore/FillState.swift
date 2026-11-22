@@ -135,3 +135,31 @@ public enum PackingEvents {
         return events
     }
 }
+
+/// Whether an event makes something go into the bag or come out of it
+/// (what a visual animates).
+public enum ItemMotion: Equatable, Sendable {
+    case enter
+    case exit
+}
+
+public extension PackingEvent {
+    /// Ticking in a packing round = goes in; ticking in an unpacking round = comes out.
+    /// Removing a tick does the opposite. Other events move nothing.
+    var motion: ItemMotion? {
+        switch self {
+        case .itemChecked(_, _, let d): return d == .pack ? .enter : .exit
+        case .itemUnchecked(_, _, let d): return d == .pack ? .exit : .enter
+        default: return nil
+        }
+    }
+
+    /// The bag the event refers to (nil for whole-round events).
+    var luggageID: UUID? {
+        switch self {
+        case .itemChecked(_, let l, _), .itemUnchecked(_, let l, _), .itemFlagged(_, let l, _): return l
+        case .luggageClosed(let l), .luggageEmptied(let l): return l
+        case .roundCompleted, .returnRoundEmptied: return nil
+        }
+    }
+}
