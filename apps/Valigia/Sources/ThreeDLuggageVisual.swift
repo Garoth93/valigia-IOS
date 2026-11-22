@@ -29,45 +29,65 @@ struct ThreeDLuggageVisual: LuggageVisual {
     var body: some View {
         RealityView { content in
             content.camera = .virtual
-            scene.build(kind: state.kind, color: UIColor(Color(hex: state.colorHex)), accent: UIColor(m3.error))
-            content.add(scene.root)
-            content.add(scene.cameraEntity)
-            for light in scene.lights { content.add(light) }
-            scene.apply(state, animated: false)
-            scene.setRotation(yaw: baseYaw, pitch: basePitch)
+            setUp(content)
         }
         .frame(height: size)
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 2)
-                .updating($drag) { value, s, _ in s = value.translation }
-                .onEnded { value in
-                    baseYaw += Float(value.translation.width) * 0.01
-                    basePitch = clampPitch(basePitch + Float(value.translation.height) * 0.006)
-                }
-        )
-        .onTapGesture(count: 2) {
-            baseYaw = -0.45
-            basePitch = 0.42
-            scene.setRotation(yaw: baseYaw, pitch: basePitch, animated: !reduceMotion)
-        }
-        .onChange(of: drag) { _, d in
-            scene.setRotation(yaw: baseYaw + Float(d.width) * 0.01,
-                              pitch: clampPitch(basePitch + Float(d.height) * 0.006))
-        }
-        .onChange(of: state) { _, s in
-            scene.apply(s, animated: !reduceMotion)
-        }
-        .onChange(of: eventID) { _, _ in
-            guard !reduceMotion else { return }
-            for e in lastEvents {
-                if let motion = e.motion { scene.flyItem(motion) }
-            }
-        }
+        .gesture(rotateGesture)
+        .onTapGesture(count: 2, perform: resetRotation)
+        .onChange(of: drag) { _, d in dragChanged(d) }
+        .onChange(of: state) { _, s in scene.apply(s, animated: !reduceMotion) }
+        .onChange(of: eventID) { _, _ in playEvents() }
         .accessibilityElement()
-        .accessibilityLabel("Valigia 3D \(state.name): \(state.progress.packed) su \(state.progress.total)\(state.isClosed ? ", chiusa" : "")")
+        .accessibilityLabel(accessibilityText)
         .accessibilityHint("Trascina per ruotarla, tocca due volte per raddrizzarla")
+    }
+
+    private var rotateGesture: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .updating($drag) { value, s, _ in s = value.translation }
+            .onEnded { value in
+                let w = Float(value.translation.width)
+                let h = Float(value.translation.height)
+                baseYaw += w * 0.01
+                basePitch = clampPitch(basePitch + h * 0.006)
+            }
+    }
+
+    private func resetRotation() {
+        baseYaw = -0.45
+        basePitch = 0.42
+        scene.setRotation(yaw: baseYaw, pitch: basePitch, animated: !reduceMotion)
+    }
+
+    private func dragChanged(_ d: CGSize) {
+        let yaw: Float = baseYaw + Float(d.width) * 0.01
+        let pitch: Float = clampPitch(basePitch + Float(d.height) * 0.006)
+        scene.setRotation(yaw: yaw, pitch: pitch)
+    }
+
+    private func playEvents() {
+        guard !reduceMotion else { return }
+        for e in lastEvents {
+            if let motion = e.motion { scene.flyItem(motion) }
+        }
+    }
+
+    private var accessibilityText: String {
+        let closed = state.isClosed ? ", chiusa" : ""
+        return "Valigia 3D \(state.name): \(state.progress.packed) su \(state.progress.total)" + closed
+    }
+
+    private func setUp(_ content: RealityViewCameraContent) {
+        let color = UIColor(Color(hex: state.colorHex))
+        let accent = UIColor(m3.error)
+        scene.build(kind: state.kind, color: color, accent: accent)
+        content.add(scene.root)
+        content.add(scene.cameraEntity)
+        for light in scene.lights { content.add(light) }
+        scene.apply(state, animated: false)
+        scene.setRotation(yaw: baseYaw, pitch: basePitch)
     }
 
     private func clampPitch(_ p: Float) -> Float { min(1.1, max(-0.2, p)) }
