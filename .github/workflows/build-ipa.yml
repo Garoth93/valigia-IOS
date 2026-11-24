@@ -1,0 +1,113 @@
+name: build-ipa
+
+# Builds every app in apps/ for a real iOS device WITHOUT code signing and
+# uploads an unsigned .ipa as a workflow artifact. The .ipa is then signed
+# on the user's side with Sideloadly / SideStore (free Apple account).
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+
+env:
+  XCODE_VERSION: "26.6"   # pinned; see CLAUDE.md "Xcode e runner"
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.list.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          apps=$(ls -d apps/*/ | xargs -n1 basename | jq -R . | jq -cs .)
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Apps: $apps"
+
+  build:
+    needs: discover
+    runs-on: macos-26
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.discover.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-xcode
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          app: ${{ matrix.app }}
+
+      - name: Build for iOS device (unsigned, Release)
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild build \
+            -project "${{ matrix.app }}.xcodeproj" \
+            -scheme "${{ matrix.app }}" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            | tee build/xcodebuild-device.log | xcbeautify --renderer github-actions
+
+      - name: Package unsigned .ipa
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          set -euo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/${{ matrix.app }}.app"
+          test -d "$APP_PATH" || { echo "::error::$APP_PATH not found"; ls -R build/DerivedData/Build/Products; exit 1; }
+          rm -rf build/ipa && mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+          # Ad-hoc signature carrying the entitlements (App Group shared with
+          # the widgets): Sideloadly / SideStore read them when re-signing.
+          PAYLOAD_APP="build/ipa/Payload/${{ matrix.app }}.app"
+          for appex in "$PAYLOAD_APP"/PlugIns/*.appex; do
+            [ -d "$appex" ] || continue
+            name=$(basename "$appex" .appex)
+            ent="${name#${{ matrix.app }}}.entitlements"
+            if [ -f "$ent" ]; then
+              codesign --force --sign - --timestamp=none --entitlements "$ent" "$appex"
+            else
+              codesign --force --sign - --timestamp=none "$appex"
+            fi
+          done
+          if [ -f "${{ matrix.app }}.entitlements" ]; then
+            codesign --force --sign - --timestamp=none --entitlements "${{ matrix.app }}.entitlements" "$PAYLOAD_APP"
+          fi
+          codesign -d --entitlements - --xml "$PAYLOAD_APP" 2>/dev/null | plutil -p - || true
+          ls "$PAYLOAD_APP/PlugIns" 2>/dev/null || true
+          (cd build/ipa && zip -qry "../${{ matrix.app }}-unsigned.ipa" Payload)
+          ls -lh "build/${{ matrix.app }}-unsigned.ipa"
+          # Show bundle id + version for the logs
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist"
+
+      - name: Upload unsigned .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-unsigned-ipa
+          path: apps/${{ matrix.app }}/build/${{ matrix.app }}-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload raw xcodebuild log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-device-log-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/build/xcodebuild-device.log
+          if-no-files-found: ignore
+          retention-days: 7

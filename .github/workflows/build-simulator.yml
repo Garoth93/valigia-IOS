@@ -1,0 +1,73 @@
+name: build-simulator
+
+# Compiles every app in apps/ for the iOS Simulator, without signing.
+# Purpose: surface Swift compile errors in CI logs on every push / PR.
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["**.md", "docs/**"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+
+env:
+  XCODE_VERSION: "26.6"   # pinned; see CLAUDE.md "Xcode e runner"
+
+concurrency:
+  group: build-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.list.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          apps=$(ls -d apps/*/ | xargs -n1 basename | jq -R . | jq -cs .)
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Apps: $apps"
+
+  build:
+    needs: discover
+    runs-on: macos-26
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.discover.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-xcode
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          app: ${{ matrix.app }}
+
+      - name: Build for iOS Simulator
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild build \
+            -project "${{ matrix.app }}.xcodeproj" \
+            -scheme "${{ matrix.app }}" \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee build/xcodebuild-simulator.log | xcbeautify --renderer github-actions
+
+      - name: Upload raw xcodebuild log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-simulator-log-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/build/xcodebuild-simulator.log
+          if-no-files-found: ignore
+          retention-days: 7

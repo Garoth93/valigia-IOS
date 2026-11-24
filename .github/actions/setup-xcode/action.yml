@@ -1,0 +1,43 @@
+name: Setup Xcode and XcodeGen
+description: >
+  Selects the pinned Xcode version, installs XcodeGen + xcbeautify and
+  generates the .xcodeproj of one app from its project.yml.
+inputs:
+  xcode-version:
+    description: Xcode version to select (must exist on the runner image)
+    required: true
+  app:
+    description: App folder name under apps/
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode ${{ inputs.xcode-version }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        XCODE_APP="/Applications/Xcode_${{ inputs.xcode-version }}.app"
+        if [ ! -d "$XCODE_APP" ]; then
+          echo "::error::Xcode ${{ inputs.xcode-version }} not found on this runner. Available:"
+          ls -d /Applications/Xcode*.app
+          exit 1
+        fi
+        sudo xcode-select -s "$XCODE_APP"
+        xcodebuild -version
+        swift --version
+
+    - name: Install XcodeGen and xcbeautify
+      shell: bash
+      run: |
+        set -euo pipefail
+        brew install xcodegen xcbeautify
+        xcodegen --version
+        xcbeautify --version
+
+    - name: Generate Xcode project for ${{ inputs.app }}
+      shell: bash
+      working-directory: apps/${{ inputs.app }}
+      run: |
+        set -euo pipefail
+        xcodegen generate
+        ls -la

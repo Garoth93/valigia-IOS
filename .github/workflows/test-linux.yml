@@ -1,0 +1,42 @@
+name: test-linux
+
+# Runs `swift test` on every Swift package under packages/ using the
+# official Swift Docker image (no macOS minutes needed).
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["**.md", "docs/**"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: test-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: swift:6.0-noble   # pinned; see CLAUDE.md "Toolchain"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: swift test (all packages)
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift --version
+          status=0
+          for manifest in packages/*/Package.swift; do
+            pkg=$(dirname "$manifest")
+            echo "::group::swift test — $pkg"
+            if ! swift test --package-path "$pkg" --parallel; then
+              echo "::error::Tests failed in $pkg"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
