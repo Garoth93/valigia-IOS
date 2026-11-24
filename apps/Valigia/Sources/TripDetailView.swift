@@ -94,6 +94,13 @@ struct TripDetailView: View {
                     }
                 }
 
+                NavigationLink {
+                    TripDocumentsView(tripID: trip.id)
+                } label: {
+                    TripDocumentsCard(trip: trip)
+                }
+                .buttonStyle(PressableStyle())
+
                 SectionTitle("Contenitori", trailing: trip.totalWeightGrams > 0 ? WeightFormat.string(trip.totalWeightGrams) : nil)
                 ForEach(trip.luggage) { bag in
                     let ref = ListRef.trip(tripID: trip.id, luggageID: bag.id)

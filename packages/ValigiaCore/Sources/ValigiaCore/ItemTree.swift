@@ -30,6 +30,7 @@ public extension Item {
     func copyWithNewIDs() -> Item {
         var copy = self
         copy.id = UUID()
+        copy.attachments = attachments.map { $0.copyWithNewID() }
         copy.children = children.map { $0.copyWithNewIDs() }
         return copy
     }

@@ -30,9 +30,7 @@ struct ItemEditorView: View {
     @State private var tags: [String] = []
     @State private var newTag = ""
     @State private var owned = true
-    @State private var photoFile: String?
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var showCamera = false
+    @State private var attachments: [Attachment] = []
     @State private var addAnother = false
     @State private var loaded = false
     @FocusState private var nameFocused: Bool
@@ -144,18 +142,12 @@ struct ItemEditorView: View {
                 .listRowBackground(m3.surfaceContainerLow)
 
                 Section {
-                    if let photoFile {
-                        PhotoThumb(name: photoFile, size: 160)
-                            .frame(maxWidth: .infinity)
-                        Button("Rimuovi foto", role: .destructive) { self.photoFile = nil }
-                    }
-                    PhotosPicker(selection: $pickerItem, matching: .images) {
-                        Label(photoFile == nil ? "Scegli una foto" : "Cambia foto", systemImage: "photo.on.rectangle")
-                    }
-                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                        Button { showCamera = true } label: { Label("Scatta una foto", systemImage: "camera") }
-                    }
-                } header: { ListHeader(title: "Foto") }
+                    AttachmentsEditor(attachments: $attachments)
+                } header: {
+                    ListHeader(title: "Allegati", trailing: attachments.isEmpty ? nil : "\(attachments.count)")
+                } footer: {
+                    Text("Tocca per aprire a schermo intero, tieni premuto per rinominare, spostare o eliminare. La prima foto fa da miniatura nella lista.")
+                }
                 .listRowBackground(m3.surfaceContainerLow)
 
                 if isNew {
@@ -178,22 +170,6 @@ struct ItemEditorView: View {
                 }
             }
             .onAppear(perform: load)
-            .onChange(of: pickerItem) { _, item in
-                guard let item else { return }
-                Task {
-                    if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data) {
-                        photoFile = PhotoStore.save(img)
-                    }
-                    pickerItem = nil
-                }
-            }
-            .fullScreenCover(isPresented: $showCamera) {
-                CameraPicker { img in
-                    if let img { photoFile = PhotoStore.save(img) }
-                    showCamera = false
-                }
-                .ignoresSafeArea()
-            }
         }
     }
 
@@ -215,7 +191,7 @@ struct ItemEditorView: View {
             note = current.note
             tags = current.tags
             owned = current.owned
-            photoFile = current.photoFile
+            attachments = current.attachments
         } else {
             nameFocused = true
         }
@@ -229,7 +205,7 @@ struct ItemEditorView: View {
         let weight = WeightFormat.parse(weightText)
         switch target {
         case .new(let parentID):
-            let item = Item(name: trimmedName, quantity: quantity, note: note, emoji: e.isEmpty ? nil : e, weightGrams: weight, tags: tags, photoFile: photoFile, owned: owned)
+            let item = Item(name: trimmedName, quantity: quantity, note: note, emoji: e.isEmpty ? nil : e, weightGrams: weight, tags: tags, attachments: attachments, owned: owned)
             model.editItems(ref) { $0.insert(item, into: parentID, at: nil) }
             if addAnother {
                 name = ""
@@ -237,7 +213,7 @@ struct ItemEditorView: View {
                 quantity = 1
                 weightText = ""
                 note = ""
-                photoFile = nil
+                attachments = []
                 nameFocused = true
                 model.show("«\(trimmedName)» aggiunta")
                 return
@@ -251,7 +227,7 @@ struct ItemEditorView: View {
                     i.emoji = e.isEmpty ? nil : e
                     i.weightGrams = weight
                     i.tags = tags
-                    i.photoFile = photoFile
+                    i.attachments = attachments
                     i.owned = owned
                 }
             }

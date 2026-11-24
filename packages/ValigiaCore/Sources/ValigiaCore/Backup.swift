@@ -8,7 +8,7 @@ public struct BackupFile: Codable, Equatable, Sendable {
     public var version: Int
     public var exportedAt: Date
     public var data: ValigiaData
-    /// Photo file name → base64 JPEG.
+    /// Attachment file name → base64 content (key kept as "photos" for old backups).
     public var photos: [String: String]
 
     public init(data: ValigiaData, photos: [String: Data] = [:], exportedAt: Date = Date()) {
@@ -34,14 +34,9 @@ public struct BackupFile: Codable, Equatable, Sendable {
         photos.compactMapValues { Data(base64Encoded: $0) }
     }
 
-    /// Photo files referenced by items (only these go into a backup).
-    public static func referencedPhotos(in data: ValigiaData) -> Set<String> {
-        var names = Set<String>()
-        func add(_ items: [Item]) { for i in items.allItems { if let p = i.photoFile { names.insert(p) } } }
-        for t in data.trips { for b in t.luggage { add(b.items) } }
-        for t in data.templates { add(t.luggage.items) }
-        add(data.alwaysItems)
-        return names
+    /// Attachment files referenced anywhere (only these go into a backup).
+    public static func referencedFiles(in data: ValigiaData) -> Set<String> {
+        data.referencedFiles
     }
 
     public func encoded() throws -> Data {

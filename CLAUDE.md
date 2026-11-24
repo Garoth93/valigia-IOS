@@ -59,8 +59,17 @@ Prepara zaini, valigie, trolley, borse con liste a più livelli.
 Modello (`Models.swift`, decodifica tollerante: campi mancanti = default):
 
 - `Item`: albero senza limite di profondità (`children`), quantità ≥ 1,
-  nota, emoji, peso unitario in grammi, tag, foto (`photoFile`), `owned`
+  nota, emoji, peso unitario in grammi, tag, `attachments`, `owned`
   (false = da comprare), `isCollapsed`, `externalRef` (integrazione futura).
+  Il vecchio `photoFile` (v1) si legge ancora e diventa il primo allegato;
+  non viene più scritto (`encode(to:)` esplicito).
+- `Attachment` (`Attachments.swift`): id, `kind` image/pdf/other, `fileName`
+  salvato (`<uuid>.<ext>`), titolo, nome originale, `byteSize`, data. Le
+  copie (template → viaggio, duplica ramo) hanno id nuovi ma **lo stesso
+  file**; `ValigiaData.referencedFiles` / `releasedFiles(before:after:)`
+  dicono quali file non sono più usati. `Trip.attachments` (documenti del
+  viaggio, non copiati da "duplica viaggio"), `Trip.documents` (viaggio +
+  voci con percorso), `attachmentsByteSize` (file condivisi contati una volta).
 - `Luggage`: tipo, colore, `Dimensions` (cm e/o litri), peso massimo e a
   vuoto, `items`.
 - `PackTemplate` (contenitore riusabile), `Trip` (contenitori copiati con
@@ -96,8 +105,14 @@ App:
 - Persistenza: `valigia-data.json` in Application Support (`DataWriter`
   actor, salvataggio differito 0,6 s, `.bak` della versione precedente,
   revisioni per non sovrascrivere dati nuovi con vecchi; file illeggibile
-  messo da parte e ripristino dal `.bak`). Foto in `Photos/` (orfane
-  rimosse all'avvio).
+  messo da parte e ripristino dal `.bak`). Allegati in `Attachments/`
+  (`AttachmentStore`, `.completeFileProtection`): i file rilasciati da una
+  modifica si cancellano solo dopo il salvataggio riuscito, gli orfani
+  all'avvio; `Photos/` della v1 migrata all'avvio. UI: `AttachmentsEditor`
+  (griglia, galleria multipla, fotocamera, scanner VisionKit → PDF, File,
+  rinomina/riordina/elimina), anteprime `QLThumbnailGenerator`, apertura con
+  `QLPreviewController` (`AttachmentPreview`, titoli dell'utente),
+  `TripDocumentsView`.
 - `AppModel.update` è l'unico punto di modifica: salva, pubblica gli eventi
   (`PackingEventCenter`, haptics), aggiorna widget snapshot e notifiche.
 - Schermate: Viaggi (prossimo viaggio, altri, passati, archiviati), dettaglio

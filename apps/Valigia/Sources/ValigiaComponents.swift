@@ -213,29 +213,6 @@ struct ItemGlyph: View {
     }
 }
 
-/// Thumbnail of an item photo.
-struct PhotoThumb: View {
-    let name: String
-    var size: CGFloat = 36
-    @State private var image: UIImage?
-
-    var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else {
-                Color.gray.opacity(0.15)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
-        .task(id: name) {
-            let n = name
-            image = await Task.detached { PhotoStore.image(named: n)?.preparingThumbnail(of: CGSize(width: 160, height: 160)) }.value
-        }
-    }
-}
-
 /// Section header inside a List.
 struct ListHeader: View {
     @Environment(\.m3) private var m3

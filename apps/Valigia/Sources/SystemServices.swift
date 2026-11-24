@@ -97,50 +97,103 @@ enum BackgroundWork {
     }
 }
 
-/// Item photos: small JPEGs in Application Support/Photos.
-enum PhotoStore {
-    static var folder: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+/// Attachment files (photos, PDFs, other files) in Application Support/Attachments,
+/// written with complete file protection (readable only while the phone is unlocked).
+/// Files are never modified: copies of items share them, and a file is deleted
+/// only when no item or trip references it anymore (`ValigiaData.referencedFiles`).
+enum AttachmentStore {
+    static var base: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return base.appendingPathComponent("Photos", isDirectory: true)
     }
+
+    static var folder: URL { base.appendingPathComponent("Attachments", isDirectory: true) }
+
+    /// Version 1 kept item photos here.
+    static var legacyFolder: URL { base.appendingPathComponent("Photos", isDirectory: true) }
 
     static func url(named name: String) -> URL { folder.appendingPathComponent(name) }
 
+    static func exists(_ name: String) -> Bool { FileManager.default.fileExists(atPath: url(named: name).path) }
+
     static func data(named name: String) -> Data? { try? Data(contentsOf: url(named: name)) }
 
-    static func image(named name: String) -> UIImage? {
-        guard let d = data(named: name) else { return nil }
-        return UIImage(data: d)
+    static func fileSize(_ name: String) -> Int {
+        ((try? FileManager.default.attributesOfItem(atPath: url(named: name).path))?[.size] as? NSNumber)?.intValue ?? 0
     }
 
-    static func write(_ data: Data, named name: String) {
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try? data.write(to: url(named: name), options: .atomic)
+    @discardableResult
+    static func write(_ data: Data, named name: String) -> Bool {
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: url(named: name), options: [.atomic, .completeFileProtection])
+            return true
+        } catch {
+            return false
+        }
     }
 
-    /// Resizes (max 1200 px), compresses and saves; returns the file name.
-    static func save(_ image: UIImage) -> String? {
-        let maxSide: CGFloat = 1200
+    /// Stores raw data as a new attachment.
+    static func importData(_ data: Data, originalName: String, title: String? = nil) -> Attachment? {
+        let id = UUID()
+        let kind = AttachmentKind.from(fileExtension: (originalName as NSString).pathExtension)
+        let stored = Attachment.storedName(forOriginal: originalName, id: id)
+        guard write(data, named: stored) else { return nil }
+        return Attachment(id: id, kind: kind, fileName: stored,
+                          title: title ?? Attachment.defaultTitle(forOriginal: originalName, kind: kind),
+                          originalName: originalName, byteSize: data.count, createdAt: Date())
+    }
+
+    /// Photo: resized (max 2000 px, enough to read a ticket) and saved as JPEG.
+    static func importImage(_ image: UIImage, title: String = "Foto") -> Attachment? {
+        let maxSide: CGFloat = 2000
         let size = image.size
-        let scale = min(1, maxSide / max(size.width, size.height))
+        let scale = min(1, maxSide / max(size.width, size.height, 1))
         let target = CGSize(width: size.width * scale, height: size.height * scale)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let resized = UIGraphicsImageRenderer(size: target, format: format).image { _ in
             image.draw(in: CGRect(origin: .zero, size: target))
         }
-        guard let jpeg = resized.jpegData(compressionQuality: 0.72) else { return nil }
-        let name = UUID().uuidString + ".jpg"
-        write(jpeg, named: name)
-        return name
+        guard let jpeg = resized.jpegData(compressionQuality: 0.8) else { return nil }
+        return importData(jpeg, originalName: "\(title).jpg", title: title)
     }
 
-    /// Deletes photos no item points to anymore.
+    /// Copies a file picked in Files.
+    static func importFile(at url: URL) -> Attachment? {
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return importData(data, originalName: url.lastPathComponent)
+    }
+
+    static func delete(_ names: Set<String>) {
+        for n in names { try? FileManager.default.removeItem(at: url(named: n)) }
+    }
+
+    /// Deletes files nothing points to anymore (e.g. added in an editor then cancelled).
     static func removeOrphans(keeping names: Set<String>) {
         guard let files = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else { return }
         for f in files where !names.contains(f) {
             try? FileManager.default.removeItem(at: url(named: f))
         }
+    }
+
+    /// Moves version 1 photos (Photos/) into Attachments/ with file protection.
+    static func migrateLegacyPhotos() {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: legacyFolder.path) else { return }
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        for f in files {
+            let src = legacyFolder.appendingPathComponent(f)
+            let dst = url(named: f)
+            if fm.fileExists(atPath: dst.path) {
+                try? fm.removeItem(at: src)
+            } else {
+                try? fm.moveItem(at: src, to: dst)
+                try? fm.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: dst.path)
+            }
+        }
+        try? fm.removeItem(at: legacyFolder)
     }
 }

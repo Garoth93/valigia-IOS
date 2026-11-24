@@ -72,8 +72,8 @@ final class BackupTests: XCTestCase {
     func testRoundTripWithPhotos() throws {
         var data = Synthetic.data()
         data.createTrip(TripDraft(name: "V", templateIDs: [data.templates[0].id]), now: Synthetic.date(2026, 2, 1))
-        data.editItems(at: .always) { $0.update($0[0].id) { $0.photoFile = "p1.jpg" } }
-        XCTAssertEqual(BackupFile.referencedPhotos(in: data), ["p1.jpg"])
+        data.editItems(at: .always) { $0.update($0[0].id) { $0.attachments = [Attachment(kind: .image, fileName: "p1.jpg", title: "Foto", createdAt: Synthetic.date(2026, 1, 1))] } }
+        XCTAssertEqual(BackupFile.referencedFiles(in: data), ["p1.jpg"])
         let backup = BackupFile(data: data, photos: ["p1.jpg": Data([1, 2, 3])], exportedAt: Synthetic.date(2026, 1, 1))
         let raw = try backup.encoded()
         let read = try BackupFile.decode(raw)

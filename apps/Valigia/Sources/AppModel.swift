@@ -84,6 +84,8 @@ final class AppModel {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var derivedTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
+    /// Files no longer referenced: deleted after the next successful save.
+    @ObservationIgnored private var releasedFiles = Set<String>()
 
     static var dataURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -124,9 +126,10 @@ final class AppModel {
         isLoaded = true
         if fresh { saveNow() }
         refreshDerived()
-        let referenced = BackupFile.referencedPhotos(in: data)
+        let referenced = data.referencedFiles
         Task.detached(priority: .background) {
-            PhotoStore.removeOrphans(keeping: referenced)
+            AttachmentStore.migrateLegacyPhotos()
+            AttachmentStore.removeOrphans(keeping: referenced)
         }
     }
 
@@ -156,6 +159,12 @@ final class AppModel {
         let rev = revision
         do {
             try await writer.save(snapshot, revision: rev)
+            // Only now (data saved) the unused files can go; still re-checked against current data.
+            let unused = releasedFiles.subtracting(data.referencedFiles)
+            releasedFiles = []
+            if !unused.isEmpty {
+                Task.detached(priority: .utility) { AttachmentStore.delete(unused) }
+            }
         } catch {
             errorMessage = "Salvataggio non riuscito: \(error.localizedDescription)"
         }
@@ -185,6 +194,7 @@ final class AppModel {
         guard copy != data else { return }
         let before = data
         data = copy
+        releasedFiles.formUnion(ValigiaData.releasedFiles(before: before, after: copy))
         publishEvents(before: before, after: copy)
         scheduleSave()
         refreshDerived()
@@ -260,8 +270,8 @@ final class AppModel {
 
     func makeBackup() -> Data? {
         var photos: [String: Data] = [:]
-        for name in BackupFile.referencedPhotos(in: data) {
-            if let d = PhotoStore.data(named: name) { photos[name] = d }
+        for name in data.referencedFiles {
+            if let d = AttachmentStore.data(named: name) { photos[name] = d }
         }
         return try? BackupFile(data: data, photos: photos).encoded()
     }
@@ -269,7 +279,7 @@ final class AppModel {
     func restore(from raw: Data) {
         do {
             let backup = try BackupFile.decode(raw)
-            for (name, d) in backup.photoData { PhotoStore.write(d, named: name) }
+            for (name, d) in backup.photoData { AttachmentStore.write(d, named: name) }
             var restored = backup.data
             restored.samplesInstalled = true
             data = restored

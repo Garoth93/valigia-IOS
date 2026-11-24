@@ -33,7 +33,16 @@ della serie: Ritorni, LTIDI, Home Alarm…).
   trascina per riordinare (pulsante ⇅) e per mettere una voce dentro un'altra,
   *Sposta in…* (anche in un altro contenitore o template), *Metti dentro la
   voce sopra* / *Porta fuori*, **duplica un ramo intero**.
-- **Voce**: nome, quantità, nota, foto (galleria o fotocamera), peso unitario
+- **Allegati** su voci e viaggi: più foto (galleria, fotocamera), PDF e file
+  da File, **scanner documenti** (il biglietto di carta diventa un PDF).
+  Anteprime in griglia, apertura a schermo intero (QuickLook: zoom, sfoglia,
+  condividi, stampa), rinomina, riordina, elimina. Graffetta col numero nella
+  lista e filtro *Con allegati*. Nel viaggio la sezione **Documenti** raccoglie
+  quelli del viaggio (biglietti, prenotazioni…) e quelli delle voci con il
+  percorso (es. *Zaino › Astuccio documenti › Passaporto*). I file sono
+  protetti (leggibili solo a telefono sbloccato) e condivisi tra le copie di
+  template e viaggi: un file si elimina solo quando nessuno lo usa più.
+- **Voce**: nome, quantità, nota, allegati, peso unitario
   (g o kg), emoji, tag (`inverno`, `volo`, `solo bagaglio a mano`…), "ce l'ho
   già". Inserimento veloce dal campo in basso (`3 calze` o `calze x3`).
 - **Pesi**: totale su ogni ramo, sul contenitore (+ peso a vuoto) e sul
@@ -82,8 +91,9 @@ Un unico file `valigia-data.json` in Application Support, scritto in modo
 atomico (mai mezzo file) con la copia precedente sempre tenuta come `.bak`: se
 il file principale non si legge, l'app riparte dalla copia e mette da parte
 quello rovinato. Scelto al posto di SwiftData perché tutta la logica (e la
-persistenza) sta nel package `ValigiaCore`, testabile anche su Linux. Le foto
-sono JPEG ridotti in Application Support/Photos.
+persistenza) sta nel package `ValigiaCore`, testabile anche su Linux. Gli
+allegati sono file in Application Support/Attachments (le foto della prima
+versione vengono spostate lì e diventano il primo allegato della voce).
 
 ## Valigia 3D e animazioni
 

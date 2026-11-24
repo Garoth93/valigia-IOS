@@ -55,6 +55,9 @@ targets:
       - sdk: PhotosUI.framework
       - sdk: Charts.framework
       - sdk: RealityKit.framework
+      - sdk: QuickLook.framework
+      - sdk: QuickLookThumbnailing.framework
+      - sdk: VisionKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.garoth93.valigia
@@ -78,8 +81,8 @@ targets:
         UIApplicationSupportsIndirectInputEvents: true
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
-        NSCameraUsageDescription: "Valigia usa la fotocamera solo per aggiungere una foto a una voce della lista. La foto resta sul tuo iPhone."
-        NSPhotoLibraryUsageDescription: "Valigia apre solo la foto che scegli, per aggiungerla a una voce della lista. Nulla lascia il tuo iPhone."
+        NSCameraUsageDescription: "Valigia usa la fotocamera per fotografare o scansionare documenti e oggetti da allegare alle voci e ai viaggi. Restano sul tuo iPhone."
+        NSPhotoLibraryUsageDescription: "Valigia apre solo le foto che scegli, per allegarle a una voce o a un viaggio. Nulla lascia il tuo iPhone."
         VLAppGroup: group.com.garoth93.valigia
         CFBundleURLTypes:
           - CFBundleURLName: com.garoth93.valigia

@@ -12,6 +12,7 @@ struct LuggageView: View {
     @State private var tags: Set<String> = []
     @State private var onlyMissing = false
     @State private var onlyToBuy = false
+    @State private var onlyWithAttachments = false
     @State private var reordering = false
     @State private var quickName = ""
     @State private var editing: ItemEditorTarget?
@@ -30,7 +31,7 @@ struct LuggageView: View {
 
     var body: some View {
         let marks = round?.markIndex ?? [:]
-        let filter = ItemFilter(query: query, tags: tags, onlyMissing: onlyMissing && isChecking, onlyToBuy: onlyToBuy)
+        let filter = ItemFilter(query: query, tags: tags, onlyMissing: onlyMissing && isChecking, onlyToBuy: onlyToBuy, onlyWithAttachments: onlyWithAttachments)
         let rows = filter.rows(for: items, marks: marks)
         let tagsInList = items.allTags
         List {
@@ -39,7 +40,7 @@ struct LuggageView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                if !tagsInList.isEmpty || isChecking {
+                if !tagsInList.isEmpty || isChecking || items.contains(where: { !$0.allAttachments.isEmpty }) {
                     filterBar(tagsInList)
                         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
                         .listRowBackground(Color.clear)
@@ -206,6 +207,11 @@ struct LuggageView: View {
                 }
                 Chip(title: "Da comprare", icon: "cart", selected: onlyToBuy) {
                     withAnimation(.snappy) { onlyToBuy.toggle() }
+                }
+                if items.contains(where: { !$0.allAttachments.isEmpty }) || onlyWithAttachments {
+                    Chip(title: "Con allegati", icon: "paperclip", selected: onlyWithAttachments) {
+                        withAnimation(.snappy) { onlyWithAttachments.toggle() }
+                    }
                 }
                 ForEach(tagsInList, id: \.self) { tag in
                     Chip(title: tag, icon: "number", selected: tags.contains(tag)) {

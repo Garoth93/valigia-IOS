@@ -10,16 +10,19 @@ public struct ItemFilter: Equatable, Sendable {
     public var onlyMissing: Bool
     /// Only items not owned yet.
     public var onlyToBuy: Bool
+    /// Only items with at least one attachment.
+    public var onlyWithAttachments: Bool
 
-    public init(query: String = "", tags: Set<String> = [], onlyMissing: Bool = false, onlyToBuy: Bool = false) {
+    public init(query: String = "", tags: Set<String> = [], onlyMissing: Bool = false, onlyToBuy: Bool = false, onlyWithAttachments: Bool = false) {
         self.query = query
         self.tags = tags
         self.onlyMissing = onlyMissing
         self.onlyToBuy = onlyToBuy
+        self.onlyWithAttachments = onlyWithAttachments
     }
 
     public var isActive: Bool {
-        !TextKey.normalized(query).isEmpty || !tags.isEmpty || onlyMissing || onlyToBuy
+        !TextKey.normalized(query).isEmpty || !tags.isEmpty || onlyMissing || onlyToBuy || onlyWithAttachments
     }
 
     /// Rows to show. `marks` is used by `onlyMissing` (empty for templates).
@@ -30,11 +33,12 @@ public struct ItemFilter: Equatable, Sendable {
 
         func selfMatches(_ item: Item, inherited: Set<String>) -> Bool {
             if !q.isEmpty {
-                let hay = TextKey.normalized(item.name + " " + item.note + " " + item.tags.joined(separator: " "))
+                let hay = TextKey.normalized(item.name + " " + item.note + " " + item.tags.joined(separator: " ") + " " + item.attachments.map(\.title).joined(separator: " "))
                 if !hay.contains(q) { return false }
             }
             if !wanted.isEmpty, !wanted.isSubset(of: inherited) { return false }
             if onlyToBuy, item.owned { return false }
+            if onlyWithAttachments, item.attachments.isEmpty { return false }
             if onlyMissing {
                 if item.isLeaf {
                     if marks[item.id]?.status == .packed { return false }

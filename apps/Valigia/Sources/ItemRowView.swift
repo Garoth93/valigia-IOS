@@ -54,6 +54,14 @@ struct ItemRowView: View {
                                     .padding(.vertical, 2)
                                     .background(m3.secondaryContainer, in: Capsule())
                             }
+                            if !item.attachments.isEmpty {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "paperclip").font(.system(size: 11, weight: .bold))
+                                    Text("\(item.attachments.count)").font(.m3LabelSmall)
+                                }
+                                .foregroundStyle(m3.onSurfaceVariant)
+                                .accessibilityLabel(ItalianFormat.plural(item.attachments.count, "allegato", "allegati"))
+                            }
                             if !item.owned {
                                 Image(systemName: "cart.fill")
                                     .font(.system(size: 11, weight: .bold))
@@ -68,8 +76,8 @@ struct ItemRowView: View {
                         }
                     }
                     Spacer(minLength: 4)
-                    if let photo = item.photoFile {
-                        PhotoThumb(name: photo, size: 34)
+                    if let image = item.attachments.firstImage {
+                        AttachmentThumb(attachment: image, size: 34)
                     }
                     if item.hasWeight {
                         Text(WeightFormat.string(item.totalWeightGrams))

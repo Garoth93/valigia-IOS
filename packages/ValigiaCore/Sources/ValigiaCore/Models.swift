@@ -15,8 +15,8 @@ public struct Item: Codable, Equatable, Hashable, Identifiable, Sendable {
     /// Weight of ONE unit, in grams (optional).
     public var weightGrams: Int?
     public var tags: [String]
-    /// File name of the photo in the app's photo folder (optional).
-    public var photoFile: String?
+    /// Photos, PDFs and other files (the first image is the row thumbnail).
+    public var attachments: [Attachment]
     /// `false` = not owned yet: the item appears in the shopping list.
     public var owned: Bool
     /// UI state of the tree, saved so the list reopens as it was left.
@@ -33,7 +33,7 @@ public struct Item: Codable, Equatable, Hashable, Identifiable, Sendable {
         emoji: String? = nil,
         weightGrams: Int? = nil,
         tags: [String] = [],
-        photoFile: String? = nil,
+        attachments: [Attachment] = [],
         owned: Bool = true,
         isCollapsed: Bool = false,
         externalRef: ExternalRef? = nil,
@@ -46,7 +46,7 @@ public struct Item: Codable, Equatable, Hashable, Identifiable, Sendable {
         self.emoji = emoji
         self.weightGrams = weightGrams
         self.tags = tags
-        self.photoFile = photoFile
+        self.attachments = attachments
         self.owned = owned
         self.isCollapsed = isCollapsed
         self.externalRef = externalRef
@@ -54,7 +54,25 @@ public struct Item: Codable, Equatable, Hashable, Identifiable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, quantity, note, emoji, weightGrams, tags, photoFile, owned, isCollapsed, externalRef, children
+        case id, name, quantity, note, emoji, weightGrams, tags, attachments, owned, isCollapsed, externalRef, children
+        /// Version 1 had a single photo: read only, migrated to the first attachment.
+        case photoFile
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(quantity, forKey: .quantity)
+        try c.encode(note, forKey: .note)
+        try c.encodeIfPresent(emoji, forKey: .emoji)
+        try c.encodeIfPresent(weightGrams, forKey: .weightGrams)
+        try c.encode(tags, forKey: .tags)
+        try c.encode(attachments, forKey: .attachments)
+        try c.encode(owned, forKey: .owned)
+        try c.encode(isCollapsed, forKey: .isCollapsed)
+        try c.encodeIfPresent(externalRef, forKey: .externalRef)
+        try c.encode(children, forKey: .children)
     }
 
     /// Tolerant decoding: missing fields take their default (older backups keep working).
@@ -67,7 +85,12 @@ public struct Item: Codable, Equatable, Hashable, Identifiable, Sendable {
         emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
         weightGrams = try c.decodeIfPresent(Int.self, forKey: .weightGrams)
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
-        photoFile = try c.decodeIfPresent(String.self, forKey: .photoFile)
+        var files = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
+        if let legacy = try c.decodeIfPresent(String.self, forKey: .photoFile), !legacy.isEmpty,
+           !files.contains(where: { $0.fileName == legacy }) {
+            files.insert(Attachment.legacyPhoto(fileName: legacy), at: 0)
+        }
+        attachments = files
         owned = try c.decodeIfPresent(Bool.self, forKey: .owned) ?? true
         isCollapsed = try c.decodeIfPresent(Bool.self, forKey: .isCollapsed) ?? false
         externalRef = try c.decodeIfPresent(ExternalRef.self, forKey: .externalRef)
@@ -400,6 +423,8 @@ public struct Trip: Codable, Equatable, Hashable, Identifiable, Sendable {
     public var isArchived: Bool
     /// Templates this trip was created from (statistics only).
     public var templateIDs: [UUID]
+    /// Documents of the trip itself (tickets, bookings, insurance…).
+    public var attachments: [Attachment]
 
     public init(
         id: UUID = UUID(),
@@ -413,7 +438,8 @@ public struct Trip: Codable, Equatable, Hashable, Identifiable, Sendable {
         activeRoundID: UUID? = nil,
         createdAt: Date = Date(),
         isArchived: Bool = false,
-        templateIDs: [UUID] = []
+        templateIDs: [UUID] = [],
+        attachments: [Attachment] = []
     ) {
         self.id = id
         self.name = name
@@ -428,10 +454,11 @@ public struct Trip: Codable, Equatable, Hashable, Identifiable, Sendable {
         self.createdAt = createdAt
         self.isArchived = isArchived
         self.templateIDs = templateIDs
+        self.attachments = attachments
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, destination, startDate, endDate, note, luggage, rounds, activeRoundID, createdAt, isArchived, templateIDs
+        case id, name, destination, startDate, endDate, note, luggage, rounds, activeRoundID, createdAt, isArchived, templateIDs, attachments
     }
 
     public init(from decoder: Decoder) throws {
@@ -448,6 +475,7 @@ public struct Trip: Codable, Equatable, Hashable, Identifiable, Sendable {
         activeRoundID = try c.decodeIfPresent(UUID.self, forKey: .activeRoundID) ?? rounds.first?.id
         isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         templateIDs = try c.decodeIfPresent([UUID].self, forKey: .templateIDs) ?? []
+        attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
     }
 
     /// Round currently being checked (falls back to the first).
