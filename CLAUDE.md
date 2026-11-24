@@ -22,7 +22,8 @@ iCloud) e `Garoth93/montagna-360` (Cresta), `Garoth93/ritorni-IOS`.
   README. I test usano solo dati **sintetici** generati nel codice
   (`Synthetic.swift`, nomi `... TEST`). I template di esempio
   (`SampleContent`) sono generici.
-- Tutto locale: nessun server, nessun account, nessuna chiamata di rete.
+- Tutto locale: nessun server, nessun account. Unica rete: il backup
+  automatico in iCloud Drive (container dell'utente, niente CloudKit).
 - Firma solo in `testflight.yml` (automatica, chiave API App Store Connect).
   Mai certificati, profili o `.p8` nella repo; Team ID solo nei secrets.
   `build-ipa.yml` resta senza firma (`CODE_SIGNING_ALLOWED=NO`).
@@ -137,6 +138,45 @@ App:
   viaggi (`allowsLarge`). L'illustrata SwiftUI è ancora "in arrivo".
 - Widget `NextTripWidget` (small/medium + blocco), tocco →
   `valigia://trip/<uuid>`. App Group `group.com.garoth93.valigia`.
+
+### Backup iCloud Drive (procedura riusabile per le altre app)
+
+Un solo container **condiviso** da tutte le app: `iCloud.com.garoth93.backup`,
+una sottocartella per app. In File appare come *iCloud Drive › Backup › <App>*.
+
+Una volta (developer.apple.com): Identifiers › iCloud Containers ›
+`iCloud.com.garoth93.backup`. Per ogni app: App ID dell'app (non del widget) ›
+iCloud (CloudKit/iCloud Documents) › *Configure* › spuntare il container.
+
+Nella repo, per ogni app:
+
+- `<App>.entitlements` (solo app, mai il widget):
+  `com.apple.developer.icloud-container-identifiers` e
+  `com.apple.developer.ubiquity-container-identifiers` = il container,
+  `com.apple.developer.icloud-services` = `CloudDocuments`;
+- `<App>.sideload.entitlements` = gli stessi senza iCloud: `build-ipa.yml` lo
+  preferisce per la firma ad-hoc (l'account gratuito non ha iCloud);
+- `project.yml`: `SystemCapabilities` `com.apple.iCloud` sul target app;
+  Info.plist `NSUbiquitousContainers` › `iCloud.com.garoth93.backup` con
+  `NSUbiquitousContainerIsDocumentScopePublic: true`,
+  `NSUbiquitousContainerName: Backup` (uguale in tutte le app),
+  `NSUbiquitousContainerSupportedFolderLevels: Any`; per il backup in
+  background `UIBackgroundModes: [fetch]` + `BGTaskSchedulerPermittedIdentifiers`;
+- file in `<container>/Documents/<App>/`: in Valigia `Valigia-backup-yyyy-MM-dd.zip`
+  (uno al giorno, ultimi 30) + `Valigia-backup-latest.zip`, scritti con
+  `BackupArchive` (gli allegati solo se `cloudIncludeAttachments`, default
+  **spento**: possono esserci documenti d'identità). Logica pura (nomi, pulizia, impronta del contenuto per non
+  riscrivere se nulla è cambiato) nel package (`CloudBackup.swift`: `CloudBackupPlan`, `isEffectivelyEmpty`, `BackupArchive.peek`),
+  I/O nell'app (`CloudBackupService.swift`): `url(forUbiquityContainerIdentifier:)`
+  sempre fuori dal main thread, scritture/letture con `NSFileCoordinator`,
+  file non scaricati = segnaposto `.<nome>.icloud` (`startDownloadingUbiquitousItem`).
+- Quando: dopo le modifiche (8 s di attesa), all'uscita in background,
+  `BGAppRefreshTask` ogni ~6 h. Un'app vuota (`isEffectivelyEmpty`: nessun viaggio, solo template di esempio
+  intatti, nessun allegato) non sovrascrive mai i backup.
+- Ripristino: Impostazioni › Ripristina da iCloud, e guidato al primo avvio
+  se l'app è vuota e in iCloud c'è un backup (chiesto una volta sola,
+  `CloudRestoreView` con anteprima: viaggi, template, allegati inclusi).
+- BGTask: `com.garoth93.valigia.backup`.
 
 ## Convenzioni di codice
 

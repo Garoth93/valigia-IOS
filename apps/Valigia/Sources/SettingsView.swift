@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var pendingRestore: URL?
     @State private var includeAttachments = true
     @State private var exporting = false
+    @State private var cloud = CloudBackupService.shared
+    @State private var showCloudRestore = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
 
     var body: some View {
@@ -125,6 +127,48 @@ struct SettingsView: View {
             .listRowBackground(m3.surfaceContainerLow)
 
             Section {
+                Toggle("Backup automatico su iCloud Drive", isOn: Binding(get: { s.cloudBackup }, set: { v in
+                    model.updateSettings { $0.cloudBackup = v }
+                    if v { cloud.invalidate() }
+                }))
+                if s.cloudBackup {
+                    Toggle(isOn: Binding(get: { s.cloudIncludeAttachments }, set: { v in
+                        model.updateSettings { $0.cloudIncludeAttachments = v }
+                        cloud.invalidate()
+                    })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Includi gli allegati")
+                            Text("Possono esserci documenti d'identità: attiva solo se vuoi averli anche in iCloud.")
+                                .font(.m3BodySmall).foregroundStyle(m3.onSurfaceVariant)
+                        }
+                    }
+                }
+                Button {
+                    Task { await cloud.backup(force: true) }
+                } label: {
+                    HStack {
+                        Label("Esegui backup ora", systemImage: "icloud.and.arrow.up")
+                        if cloud.isWorking { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(cloud.isWorking || model.data.isEffectivelyEmpty)
+                Button { showCloudRestore = true } label: { Label("Ripristina da iCloud", systemImage: "icloud.and.arrow.down") }
+                if let last = cloud.lastBackupAt {
+                    LabeledContent("Ultimo backup", value: last.formatted(date: .abbreviated, time: .shortened))
+                }
+                if cloud.available == false {
+                    Label("iCloud Drive non disponibile (accesso a iCloud, iCloud Drive attivo per Valigia; non funziona con l'installazione Sideloadly).", systemImage: "exclamationmark.icloud")
+                        .font(.m3BodySmall).foregroundStyle(m3.error)
+                }
+                if let e = cloud.lastError {
+                    Text(e).font(.m3BodySmall).foregroundStyle(m3.error)
+                }
+            } header: { ListHeader(title: "iCloud") } footer: {
+                Text("Un backup .zip al giorno (gli ultimi 30) più l'ultimo, in File › iCloud Drive › Backup › Valigia. Viene scritto dopo le modifiche, quando esci dall'app e in background. Un'app vuota non sovrascrive mai i backup.")
+            }
+            .listRowBackground(m3.surfaceContainerLow)
+
+            Section {
                 Toggle(isOn: Binding(get: { s.lockDocuments }, set: { v in setDocumentLock(v) })) {
                     Label("\(DeviceAuth.biometryName) per aprire i documenti", systemImage: "lock.doc")
                 }
@@ -151,6 +195,7 @@ struct SettingsView: View {
         .background(m3.surface)
         .navigationTitle("Impostazioni")
         .task { await refreshStatus() }
+        .sheet(isPresented: $showCloudRestore) { CloudRestoreView(firstLaunch: false) }
         .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .zip, defaultFilename: exportDoc.url?.lastPathComponent ?? "valigia-backup.zip") { result in
             if case .success = result { model.show("Backup salvato") }
             if let url = exportDoc.url { try? FileManager.default.removeItem(at: url) }

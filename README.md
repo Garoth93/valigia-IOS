@@ -67,6 +67,13 @@ della serie: Ritorni, LTIDI, Home Alarm…).
 - **Backup/ripristino .zip** (dati + cartella degli allegati, con o senza
   allegati e dimensione prevista); si ripristinano anche i vecchi backup .json.
 - **Face ID facoltativo** per aprire e vedere in anteprima i documenti.
+- **Backup automatico su iCloud Drive** (File › iCloud Drive › Backup ›
+  Valigia, lo stesso contenitore di Tessere e Cresta): uno zip al giorno (gli
+  ultimi 30) più l'ultimo, scritto dopo le modifiche, all'uscita e in
+  background. Gli allegati entrano nel backup iCloud solo se li attivi
+  (default spento). Ripristino da Impostazioni › iCloud e, al primo avvio su
+  un iPhone nuovo, proposto da solo se in iCloud c'è un backup. Con
+  l'installazione Sideloadly iCloud non è disponibile (usa il backup .zip).
 
 ## Installare l'app sull'iPhone
 
@@ -90,7 +97,7 @@ con i widget" dice se la firma ha incluso l'App Group.
 
 ## Salvataggio
 
-Un unico file `valigia-data.json` in Application Support, scritto in modo
+In locale un unico file `valigia-data.json` in Application Support, scritto in modo
 atomico (mai mezzo file) con la copia precedente sempre tenuta come `.bak`: se
 il file principale non si legge, l'app riparte dalla copia e mette da parte
 quello rovinato. Scelto al posto di SwiftData perché tutta la logica (e la

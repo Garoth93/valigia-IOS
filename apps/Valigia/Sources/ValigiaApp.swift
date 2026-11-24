@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = notificationDelegate
+        CloudBackupService.registerBackgroundTask()
         MainActor.assumeIsolated {
             _ = AppModel.shared
         }
@@ -31,6 +32,10 @@ struct ValigiaApp: App {
             if phase == .background {
                 model.saveNow()
                 DocumentLock.shared.lock()
+                BackgroundWork.run("valigia-icloud-backup") {
+                    await CloudBackupService.shared.backup(force: false)
+                }
+                CloudBackupService.scheduleBackgroundRefresh()
             }
         }
     }

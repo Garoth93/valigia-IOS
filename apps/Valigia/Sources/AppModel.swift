@@ -126,6 +126,7 @@ final class AppModel {
         isLoaded = true
         if fresh { saveNow() }
         refreshDerived()
+        Task { await CloudBackupService.shared.offerRestoreIfNeeded() }
         let referenced = data.referencedFiles
         Task.detached(priority: .background) {
             AttachmentStore.migrateLegacyPhotos()
@@ -198,6 +199,7 @@ final class AppModel {
         publishEvents(before: before, after: copy)
         scheduleSave()
         refreshDerived()
+        CloudBackupService.shared.schedule()
     }
 
     func updateTrip(_ id: UUID, _ change: (inout Trip) -> Void) {

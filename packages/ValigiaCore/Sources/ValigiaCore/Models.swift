@@ -537,6 +537,10 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
     public var visualStyle: LuggageVisualStyle
     /// Face ID (or passcode) before opening or showing attachments.
     public var lockDocuments: Bool
+    /// Automatic backup in iCloud Drive (shared "Backup" container, folder "Valigia").
+    public var cloudBackup: Bool
+    /// Put attachments (possibly identity documents) in the iCloud backup too.
+    public var cloudIncludeAttachments: Bool
 
     public init(
         appearance: Appearance = .system,
@@ -547,7 +551,9 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
         reminderMinute: Int = 0,
         haptics: Bool = true,
         visualStyle: LuggageVisualStyle = .simple,
-        lockDocuments: Bool = false
+        lockDocuments: Bool = false,
+        cloudBackup: Bool = true,
+        cloudIncludeAttachments: Bool = false
     ) {
         self.appearance = appearance
         self.seedHex = seedHex
@@ -558,10 +564,12 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
         self.haptics = haptics
         self.visualStyle = visualStyle
         self.lockDocuments = lockDocuments
+        self.cloudBackup = cloudBackup
+        self.cloudIncludeAttachments = cloudIncludeAttachments
     }
 
     private enum CodingKeys: String, CodingKey {
-        case appearance, seedHex, tintWithLuggageColor, reminderEnabled, reminderHour, reminderMinute, haptics, visualStyle, lockDocuments
+        case appearance, seedHex, tintWithLuggageColor, reminderEnabled, reminderHour, reminderMinute, haptics, visualStyle, lockDocuments, cloudBackup, cloudIncludeAttachments
     }
 
     public init(from decoder: Decoder) throws {
@@ -576,6 +584,8 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
         haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? d.haptics
         visualStyle = try c.decodeIfPresent(LuggageVisualStyle.self, forKey: .visualStyle) ?? d.visualStyle
         lockDocuments = try c.decodeIfPresent(Bool.self, forKey: .lockDocuments) ?? d.lockDocuments
+        cloudBackup = try c.decodeIfPresent(Bool.self, forKey: .cloudBackup) ?? d.cloudBackup
+        cloudIncludeAttachments = try c.decodeIfPresent(Bool.self, forKey: .cloudIncludeAttachments) ?? d.cloudIncludeAttachments
     }
 }
 

@@ -4,9 +4,11 @@ import ValigiaCore
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.m3) private var m3
+    @State private var cloud = CloudBackupService.shared
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var cloud = cloud
         TabView(selection: $model.tab) {
             Tab("Viaggi", systemImage: "suitcase.rolling.fill", value: AppTab.trips) {
                 NavigationStack { TripsView() }
@@ -24,6 +26,9 @@ struct RootView: View {
             Tab("Impostazioni", systemImage: "gearshape.fill", value: AppTab.settings) {
                 NavigationStack { SettingsView() }
             }
+        }
+        .sheet(isPresented: $cloud.offerRestore) {
+            CloudRestoreView(firstLaunch: true)
         }
         .alert("Attenzione", isPresented: Binding(
             get: { model.errorMessage != nil },

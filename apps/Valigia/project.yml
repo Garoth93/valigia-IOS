@@ -40,6 +40,10 @@ targets:
     # Tells Xcode's automatic signing which capabilities the App ID needs.
     attributes:
       SystemCapabilities:
+        com.apple.BackgroundModes:
+          enabled: 1
+        com.apple.iCloud:
+          enabled: 1
         com.apple.ApplicationGroups.iOS:
           enabled: 1
     sources:
@@ -59,6 +63,7 @@ targets:
       - sdk: QuickLookThumbnailing.framework
       - sdk: VisionKit.framework
       - sdk: LocalAuthentication.framework
+      - sdk: BackgroundTasks.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.garoth93.valigia
@@ -85,6 +90,17 @@ targets:
         NSCameraUsageDescription: "Valigia usa la fotocamera per fotografare o scansionare documenti e oggetti da allegare alle voci e ai viaggi. Restano sul tuo iPhone."
         NSFaceIDUsageDescription: "Valigia usa Face ID, se lo attivi nelle Impostazioni, per proteggere i documenti allegati (biglietti, documenti d'identità)."
         NSPhotoLibraryUsageDescription: "Valigia apre solo le foto che scegli, per allegarle a una voce o a un viaggio. Nulla lascia il tuo iPhone."
+        # Backups: shared iCloud container of all the apps, visible in Files as
+        # iCloud Drive › Backup (each app writes in its own sub-folder).
+        NSUbiquitousContainers:
+          iCloud.com.garoth93.backup:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Backup
+            NSUbiquitousContainerSupportedFolderLevels: Any
+        UIBackgroundModes:
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.garoth93.valigia.backup
         VLAppGroup: group.com.garoth93.valigia
         CFBundleURLTypes:
           - CFBundleURLName: com.garoth93.valigia
