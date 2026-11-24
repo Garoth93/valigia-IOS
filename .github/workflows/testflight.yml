@@ -21,7 +21,7 @@ name: testflight
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
     paths: ["apps/**", "packages/**", ".github/workflows/testflight.yml"]
   schedule:
     - cron: "17 4 1 */2 *"

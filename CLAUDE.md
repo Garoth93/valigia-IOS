@@ -152,7 +152,7 @@ App:
 | `build-simulator.yml` | push su ogni branch, PR, manuale | `xcodebuild build` per iOS Simulator, senza firma. Serve a vedere gli errori di compilazione. |
 | `build-ipa.yml` | push su `main` e `claude/**`, manuale | build Release per dispositivo con `CODE_SIGNING_ALLOWED=NO`, firma ad-hoc con gli `.entitlements` dell'app e del widget, impacchetta `Payload/<App>.app` in `<App>-unsigned.ipa` e lo carica come artifact (30 giorni). |
 | `test-linux.yml` | push su ogni branch, PR, manuale | `swift test` su ogni package in `packages/`. |
-| `testflight.yml` | manuale, push su `main`, ogni ~60 giorni (1° dei mesi dispari) | archive firmato + export App Store + upload su TestFlight (vedi sotto). |
+| `testflight.yml` | manuale, push su `main` e `claude/**`, ogni ~60 giorni (1° dei mesi dispari) | archive firmato + export App Store + upload su TestFlight (vedi sotto). |
 
 Nota: `build-ipa.yml` firma ad-hoc l'app con `<App>.sideload.entitlements`
 se esiste (senza iCloud, che l'account gratuito non può firmare).
