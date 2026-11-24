@@ -8,12 +8,15 @@ public enum TextExport {
         public var onlyMissing: Bool
         public var withWeights: Bool
         public var withNotes: Bool
+        /// Titles of the attachments ("📎 Andata, Ritorno"); the files themselves are shared apart.
+        public var withAttachments: Bool
 
-        public init(withChecks: Bool = true, onlyMissing: Bool = false, withWeights: Bool = true, withNotes: Bool = true) {
+        public init(withChecks: Bool = true, onlyMissing: Bool = false, withWeights: Bool = true, withNotes: Bool = true, withAttachments: Bool = true) {
             self.withChecks = withChecks
             self.onlyMissing = onlyMissing
             self.withWeights = withWeights
             self.withNotes = withNotes
+            self.withAttachments = withAttachments
         }
     }
 
@@ -24,6 +27,9 @@ public enum TextExport {
         if !trip.destination.isEmpty { info.append("📍 \(trip.destination)") }
         if let d = ItalianFormat.range(trip.startDate, trip.endDate, calendar: calendar) { info.append("🗓 \(d)") }
         if !info.isEmpty { lines.append(info.joined(separator: " · ")) }
+        if options.withAttachments, !trip.attachments.isEmpty {
+            lines.append("📎 Documenti: " + trip.attachments.map(\.title).joined(separator: ", "))
+        }
         if options.withChecks, let round {
             let p = trip.progress(round: round.id)
             lines.append("Giro: \(round.name) — \(p.packed)/\(p.total)")
@@ -66,6 +72,9 @@ public enum TextExport {
             if !item.owned { l += " 🛒" }
             if options.withNotes, !item.note.isEmpty { l += " — \(item.note)" }
             if let place = marks[item.id]?.place, !place.isEmpty { l += " (\(place))" }
+            if options.withAttachments, !item.attachments.isEmpty {
+                l += " 📎 " + item.attachments.map(\.title).joined(separator: ", ")
+            }
             lines.append(l)
         }
         if bag.items.isEmpty { lines.append("   (vuoto)") }

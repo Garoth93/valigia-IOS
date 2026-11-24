@@ -58,6 +58,7 @@ targets:
       - sdk: QuickLook.framework
       - sdk: QuickLookThumbnailing.framework
       - sdk: VisionKit.framework
+      - sdk: LocalAuthentication.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.garoth93.valigia
@@ -82,6 +83,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSRequiresIPhoneOS: true
         NSCameraUsageDescription: "Valigia usa la fotocamera per fotografare o scansionare documenti e oggetti da allegare alle voci e ai viaggi. Restano sul tuo iPhone."
+        NSFaceIDUsageDescription: "Valigia usa Face ID, se lo attivi nelle Impostazioni, per proteggere i documenti allegati (biglietti, documenti d'identità)."
         NSPhotoLibraryUsageDescription: "Valigia apre solo le foto che scegli, per allegarle a una voce o a un viaggio. Nulla lascia il tuo iPhone."
         VLAppGroup: group.com.garoth93.valigia
         CFBundleURLTypes:

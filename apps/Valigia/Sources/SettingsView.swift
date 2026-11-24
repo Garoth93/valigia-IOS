@@ -8,8 +8,10 @@ struct SettingsView: View {
     @Environment(\.m3) private var m3
     @State private var showExporter = false
     @State private var showImporter = false
-    @State private var exportDoc = DataFileDocument(data: Data())
-    @State private var pendingRestore: Data?
+    @State private var exportDoc = FileURLDocument(url: nil)
+    @State private var pendingRestore: URL?
+    @State private var includeAttachments = true
+    @State private var exporting = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
 
     var body: some View {
@@ -93,15 +95,41 @@ struct SettingsView: View {
             .listRowBackground(m3.surfaceContainerLow)
 
             Section {
-                Button {
-                    if let d = model.makeBackup() {
-                        exportDoc = DataFileDocument(data: d)
-                        showExporter = true
+                Toggle(isOn: $includeAttachments) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Includi gli allegati")
+                        Text("Dimensione prevista: \(ByteFormat.string(model.estimatedBackupSize(includeAttachments: includeAttachments)))")
+                            .font(.m3BodySmall).foregroundStyle(m3.onSurfaceVariant)
                     }
-                } label: { Label("Esporta backup JSON", systemImage: "square.and.arrow.up") }
-                Button { showImporter = true } label: { Label("Ripristina da backup", systemImage: "square.and.arrow.down") }
+                }
+                Button {
+                    exporting = true
+                    Task {
+                        if let url = await model.makeBackup(includeAttachments: includeAttachments) {
+                            exportDoc = FileURLDocument(url: url)
+                            showExporter = true
+                        }
+                        exporting = false
+                    }
+                } label: {
+                    HStack {
+                        Label("Esporta backup (.zip)", systemImage: "square.and.arrow.up")
+                        if exporting { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(exporting)
+                Button { showImporter = true } label: { Label("Ripristina da backup (.zip o .json)", systemImage: "square.and.arrow.down") }
             } header: { ListHeader(title: "Backup") } footer: {
-                Text("Il backup contiene viaggi, template, spunte, impostazioni e foto. Il ripristino sostituisce tutti i dati attuali.")
+                Text("Lo zip contiene viaggi, template, spunte, impostazioni e, se vuoi, gli allegati (attenzione: possono esserci documenti d'identità). Il ripristino sostituisce tutti i dati attuali; si leggono anche i vecchi backup .json.")
+            }
+            .listRowBackground(m3.surfaceContainerLow)
+
+            Section {
+                Toggle(isOn: Binding(get: { s.lockDocuments }, set: { v in setDocumentLock(v) })) {
+                    Label("\(DeviceAuth.biometryName) per aprire i documenti", systemImage: "lock.doc")
+                }
+            } header: { ListHeader(title: "Privacy") } footer: {
+                Text("Chiede \(DeviceAuth.biometryName) prima di aprire o mostrare in anteprima gli allegati. Resta sbloccato finché l'app non va in background. I file sono comunque cifrati da iOS quando il telefono è bloccato.")
             }
             .listRowBackground(m3.surfaceContainerLow)
 
@@ -123,33 +151,47 @@ struct SettingsView: View {
         .background(m3.surface)
         .navigationTitle("Impostazioni")
         .task { await refreshStatus() }
-        .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .json, defaultFilename: backupName) { result in
+        .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .zip, defaultFilename: exportDoc.url?.lastPathComponent ?? "valigia-backup.zip") { result in
             if case .success = result { model.show("Backup salvato") }
+            if let url = exportDoc.url { try? FileManager.default.removeItem(at: url) }
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.zip, .json]) { result in
             guard case .success(let url) = result else { return }
-            let access = url.startAccessingSecurityScopedResource()
-            defer { if access { url.stopAccessingSecurityScopedResource() } }
-            if let d = try? Data(contentsOf: url) {
-                pendingRestore = d
-            } else {
-                model.errorMessage = "Non riesco a leggere il file."
-            }
+            pendingRestore = url
         }
         .confirmationDialog("Ripristinare il backup?", isPresented: Binding(get: { pendingRestore != nil }, set: { if !$0 { pendingRestore = nil } }), titleVisibility: .visible) {
             Button("Sostituisci tutti i dati", role: .destructive) {
-                if let d = pendingRestore { model.restore(from: d) }
+                if let u = pendingRestore { model.restore(from: u) }
                 pendingRestore = nil
             }
         } message: { Text("I dati attuali verranno sostituiti da quelli del backup.") }
     }
 
-    private var backupName: String {
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
-        return String(format: "valigia-backup-%04d-%02d-%02d.json", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    private func setDocumentLock(_ on: Bool) {
+        Task {
+            // Turning the protection off needs the same authentication.
+            if !on, !(await DeviceAuth.authenticate(reason: "Disattiva la protezione dei documenti")) { return }
+            model.updateSettings { $0.lockDocuments = on }
+            if on { DocumentLock.shared.lock() }
+        }
     }
 
     private func refreshStatus() async {
         notificationStatus = await Notifier.authorizationStatus()
+    }
+}
+
+/// Exports an existing file (the backup zip) without loading it in memory.
+struct FileURLDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.zip] }
+    var url: URL?
+
+    init(url: URL?) { self.url = url }
+
+    init(configuration: ReadConfiguration) throws { url = nil }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard let url else { throw CocoaError(.fileNoSuchFile) }
+        return try FileWrapper(url: url, options: .immediate)
     }
 }

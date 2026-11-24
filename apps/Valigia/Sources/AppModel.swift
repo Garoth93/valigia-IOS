@@ -268,27 +268,50 @@ final class AppModel {
 
     // MARK: Backup
 
-    func makeBackup() -> Data? {
-        var photos: [String: Data] = [:]
-        for name in data.referencedFiles {
-            if let d = AttachmentStore.data(named: name) { photos[name] = d }
-        }
-        return try? BackupFile(data: data, photos: photos).encoded()
+    /// Expected size of an export (shown before exporting).
+    func estimatedBackupSize(includeAttachments: Bool) -> Int {
+        BackupArchive.estimatedSize(of: data, includeAttachments: includeAttachments) { AttachmentStore.fileSize($0) }
     }
 
-    func restore(from raw: Data) {
-        do {
-            let backup = try BackupFile.decode(raw)
-            for (name, d) in backup.photoData { AttachmentStore.write(d, named: name) }
-            var restored = backup.data
-            restored.samplesInstalled = true
-            data = restored
-            saveNow()
-            refreshDerived()
-            show("Backup ripristinato: \(ItalianFormat.plural(restored.trips.count, "viaggio", "viaggi")), \(ItalianFormat.plural(restored.templates.count, "template", "template"))")
-        } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+    /// Writes a .zip backup in a temporary folder and returns it.
+    func makeBackup(includeAttachments: Bool) async -> URL? {
+        let snapshot = data
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(BackupArchive.fileName(for: Date()))
+        let result = await Task.detached(priority: .userInitiated) { () -> Result<BackupArchive.Summary, Error> in
+            Result { try BackupArchive.write(snapshot, includeAttachments: includeAttachments, to: url) { AttachmentStore.url(named: $0) } }
+        }.value
+        switch result {
+        case .success(let summary):
+            if summary.missingFiles > 0 {
+                show("\(ItalianFormat.plural(summary.missingFiles, "allegato mancante", "allegati mancanti")) sul telefono: esclusi", icon: "exclamationmark.triangle.fill", style: .info)
+            }
+            return url
+        case .failure(let error):
+            errorMessage = "Backup non riuscito: \(error.localizedDescription)"
+            return nil
         }
+    }
+
+    /// Restores a .zip backup or an old .json one (files included).
+    func restore(from url: URL) {
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let result = try BackupArchive.read(from: url) { name, content in AttachmentStore.write(content, named: name) }
+            apply(restored: result.data)
+            show("Backup ripristinato: \(ItalianFormat.plural(result.data.trips.count, "viaggio", "viaggi")), \(ItalianFormat.plural(result.files, "allegato", "allegati"))")
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Il file non è un backup di Valigia leggibile."
+        }
+    }
+
+    /// Replaces all data (restore): saved immediately.
+    func apply(restored: ValigiaData) {
+        var restored = restored
+        restored.samplesInstalled = true
+        data = restored
+        saveNow()
+        refreshDerived()
     }
 
     func reinstallSamples() {

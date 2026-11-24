@@ -96,9 +96,14 @@ Regole (tutte testate):
 - `FillState.swift`: `LuggageFillState` / `TripFillState` e
   `PackingEvents.diff` = **architettura per le animazioni di fase 2**.
 - `Filtering.swift` (ricerca senza accenti, tag ereditati, solo mancanti,
-  da comprare) + `ShoppingList`; `Stats.swift`; `Sharing.swift`
-  (testo, promemoria, `WidgetSnapshot`); `Backup.swift` (backup con foto
-  base64, `GearCatalogProvider` solo protocollo); `SampleContent`.
+  da comprare, con allegati, titoli degli allegati) + `ShoppingList`;
+  `Stats.swift`; `Sharing.swift` (testo con 📎 titoli allegati, promemoria,
+  `WidgetSnapshot`); `Backup.swift` (`BackupFile` JSON, decodifica dei vecchi
+  backup v1 con file base64 in `photos`, `GearCatalogProvider` solo
+  protocollo); `BackupArchive.swift` (backup **.zip**: `valigia-backup.json`
+  + `Attachments/<file>`, con/senza allegati, `estimatedSize`, lettura anche
+  dei vecchi `.json`); `MiniZip.swift` (da Diario Sonoro: STORE, CRC32,
+  `ZipPath.isSafe` contro i percorsi `..`); `SampleContent`.
 
 App:
 
@@ -113,6 +118,10 @@ App:
   rinomina/riordina/elimina), anteprime `QLThumbnailGenerator`, apertura con
   `QLPreviewController` (`AttachmentPreview`, titoli dell'utente),
   `TripDocumentsView`.
+- Privacy documenti: `ValigiaSettings.lockDocuments` → `DocumentLock`
+  (Face ID / codice una volta per sessione, si richiude in background):
+  `AttachmentPreview.open` chiede lo sblocco, `AttachmentThumb` mostra solo
+  l'icona finché è bloccato. Disattivarlo richiede l'autenticazione.
 - `AppModel.update` è l'unico punto di modifica: salva, pubblica gli eventi
   (`PackingEventCenter`, haptics), aggiorna widget snapshot e notifiche.
 - Schermate: Viaggi (prossimo viaggio, altri, passati, archiviati), dettaglio

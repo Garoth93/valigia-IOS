@@ -28,7 +28,10 @@ struct ValigiaApp: App {
                 .onOpenURL { model.handle(url: $0) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { model.saveNow() }
+            if phase == .background {
+                model.saveNow()
+                DocumentLock.shared.lock()
+            }
         }
     }
 }

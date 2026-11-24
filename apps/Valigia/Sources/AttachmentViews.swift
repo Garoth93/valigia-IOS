@@ -19,7 +19,7 @@ struct AttachmentThumb: View {
     var body: some View {
         ZStack {
             m3.surfaceContainerHighest
-            if let image {
+            if let image, DocumentLock.shared.canShow {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 Image(systemName: attachment.kind.symbol)
@@ -78,6 +78,13 @@ enum AttachmentPreview {
     private static var source: Source?
 
     static func open(_ attachments: [Attachment], at index: Int) {
+        Task { @MainActor in
+            guard await DocumentLock.shared.unlock() else { return }
+            present(attachments, at: index)
+        }
+    }
+
+    private static func present(_ attachments: [Attachment], at index: Int) {
         let items = attachments
             .filter { AttachmentStore.exists($0.fileName) }
             .map { Item(url: AttachmentStore.url(named: $0.fileName), title: $0.title) }

@@ -535,6 +535,8 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
     public var reminderMinute: Int
     public var haptics: Bool
     public var visualStyle: LuggageVisualStyle
+    /// Face ID (or passcode) before opening or showing attachments.
+    public var lockDocuments: Bool
 
     public init(
         appearance: Appearance = .system,
@@ -544,7 +546,8 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
         reminderHour: Int = 20,
         reminderMinute: Int = 0,
         haptics: Bool = true,
-        visualStyle: LuggageVisualStyle = .simple
+        visualStyle: LuggageVisualStyle = .simple,
+        lockDocuments: Bool = false
     ) {
         self.appearance = appearance
         self.seedHex = seedHex
@@ -554,10 +557,11 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
         self.reminderMinute = reminderMinute
         self.haptics = haptics
         self.visualStyle = visualStyle
+        self.lockDocuments = lockDocuments
     }
 
     private enum CodingKeys: String, CodingKey {
-        case appearance, seedHex, tintWithLuggageColor, reminderEnabled, reminderHour, reminderMinute, haptics, visualStyle
+        case appearance, seedHex, tintWithLuggageColor, reminderEnabled, reminderHour, reminderMinute, haptics, visualStyle, lockDocuments
     }
 
     public init(from decoder: Decoder) throws {
@@ -571,6 +575,7 @@ public struct ValigiaSettings: Codable, Equatable, Sendable {
         reminderMinute = try c.decodeIfPresent(Int.self, forKey: .reminderMinute) ?? d.reminderMinute
         haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? d.haptics
         visualStyle = try c.decodeIfPresent(LuggageVisualStyle.self, forKey: .visualStyle) ?? d.visualStyle
+        lockDocuments = try c.decodeIfPresent(Bool.self, forKey: .lockDocuments) ?? d.lockDocuments
     }
 }
 

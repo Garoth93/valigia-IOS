@@ -60,10 +60,13 @@ della serie: Ritorni, LTIDI, Home Alarm…).
   presenti", in un'unica lista da spuntare o condividere.
 - **Notifica** la sera prima della partenza (orario a scelta) con quanto manca.
 - **Widget** Home e schermata di blocco con l'avanzamento del prossimo viaggio.
-- **Condivisione** come testo (con spunte, solo mancanti o lista semplice).
+- **Condivisione** come testo (con spunte, solo mancanti o lista semplice),
+  con i titoli degli allegati (📎).
 - **Statistiche**: viaggi fatti, giorni in viaggio, voci dimenticate più
   spesso, peso medio per tipo di contenitore, template più usati.
-- **Backup/ripristino JSON** (foto comprese).
+- **Backup/ripristino .zip** (dati + cartella degli allegati, con o senza
+  allegati e dimensione prevista); si ripristinano anche i vecchi backup .json.
+- **Face ID facoltativo** per aprire e vedere in anteprima i documenti.
 
 ## Installare l'app sull'iPhone
 

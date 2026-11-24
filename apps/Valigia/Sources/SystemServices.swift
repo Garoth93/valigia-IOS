@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import UserNotifications
+import LocalAuthentication
 import ValigiaCore
 
 /// "The evening before departure" notifications.
@@ -195,5 +196,52 @@ enum AttachmentStore {
             }
         }
         try? fm.removeItem(at: legacyFolder)
+    }
+}
+
+/// Optional Face ID / passcode before showing attachments (setting "lockDocuments").
+/// Unlocked once per session; locked again when the app goes to background.
+@MainActor
+@Observable
+final class DocumentLock {
+    static let shared = DocumentLock()
+    private(set) var isUnlocked = false
+
+    var isRequired: Bool { AppModel.shared.data.settings.lockDocuments }
+
+    /// Documents may be shown right now.
+    var canShow: Bool { !isRequired || isUnlocked }
+
+    func lock() { isUnlocked = false }
+
+    /// Asks Face ID / passcode if needed. Returns true when documents can be shown.
+    @discardableResult
+    func unlock(reason: String = "Sblocca per vedere i documenti") async -> Bool {
+        if canShow { return true }
+        let ok = await DeviceAuth.authenticate(reason: reason)
+        isUnlocked = ok
+        return ok
+    }
+}
+
+/// Face ID / Touch ID / passcode.
+enum DeviceAuth {
+    static var biometryName: String {
+        let ctx = LAContext()
+        _ = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+        switch ctx.biometryType {
+        case .faceID: return "Face ID"
+        case .touchID: return "Touch ID"
+        case .opticID: return "Optic ID"
+        default: return "il codice"
+        }
+    }
+
+    static func authenticate(reason: String) async -> Bool {
+        let ctx = LAContext()
+        var err: NSError?
+        // No passcode set on the phone: nothing to protect with.
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else { return true }
+        return (try? await ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason)) ?? false
     }
 }

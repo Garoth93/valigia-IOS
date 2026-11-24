@@ -12,6 +12,17 @@ struct TripDocumentsView: View {
         if let trip = model.data.trip(tripID) {
             let itemDocs = trip.documents.filter { $0.source != .trip }
             List {
+                if !DocumentLock.shared.canShow {
+                    Section {
+                        Button {
+                            Task { await DocumentLock.shared.unlock() }
+                        } label: {
+                            Label("Sblocca con \(DeviceAuth.biometryName) per vedere le anteprime", systemImage: "lock.fill")
+                                .font(.m3TitleSmall)
+                        }
+                    }
+                    .listRowBackground(m3.surfaceContainerHigh)
+                }
                 Section {
                     AttachmentsEditor(attachments: Binding(
                         get: { model.data.trip(tripID)?.attachments ?? [] },
@@ -55,6 +66,7 @@ struct TripDocumentsView: View {
             .scrollContentBackground(.hidden)
             .background(m3.surface)
             .navigationTitle("Documenti")
+            .task { await DocumentLock.shared.unlock() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
