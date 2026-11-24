@@ -2,11 +2,12 @@
 
 Repo di app iOS **native (Swift + SwiftUI)** personali, sviluppate senza Mac:
 il codice viene scritto su Linux (Claude Code) e compilato **solo** su GitHub
-Actions con runner macOS. Le app non vanno su App Store: l'utente scarica il
-`.ipa` non firmato dagli artifact e lo firma con Sideloadly/SideStore.
+Actions con runner macOS. Distribuzione: app su **TestFlight** (account Apple
+a pagamento, firma automatica in CI); il `.ipa` non firmato per Sideloadly
+resta come ripiego.
 
-Stessa impostazione delle repo `Garoth93/ritorni-IOS`, `Garoth93/home-alarm-IOS`
-e `Garoth93/LTIDI-Last-Time-I-Did-It-IOS`.
+Stessa impostazione delle repo `Garoth93/tessere-IOS` (TestFlight, backup
+iCloud) e `Garoth93/montagna-360` (Cresta), `Garoth93/ritorni-IOS`.
 
 ## Vincoli fissi
 
@@ -22,7 +23,9 @@ e `Garoth93/LTIDI-Last-Time-I-Did-It-IOS`.
   (`Synthetic.swift`, nomi `... TEST`). I template di esempio
   (`SampleContent`) sono generici.
 - Tutto locale: nessun server, nessun account, nessuna chiamata di rete.
-- Account Apple gratuito: nessuna firma in CI (`CODE_SIGNING_ALLOWED=NO`).
+- Firma solo in `testflight.yml` (automatica, chiave API App Store Connect).
+  Mai certificati, profili o `.p8` nella repo; Team ID solo nei secrets.
+  `build-ipa.yml` resta senza firma (`CODE_SIGNING_ALLOWED=NO`).
 - Non modificare impostazioni della repo o secrets: spiegare all'utente cosa
   configurare.
 
@@ -149,6 +152,52 @@ App:
 | `build-simulator.yml` | push su ogni branch, PR, manuale | `xcodebuild build` per iOS Simulator, senza firma. Serve a vedere gli errori di compilazione. |
 | `build-ipa.yml` | push su `main` e `claude/**`, manuale | build Release per dispositivo con `CODE_SIGNING_ALLOWED=NO`, firma ad-hoc con gli `.entitlements` dell'app e del widget, impacchetta `Payload/<App>.app` in `<App>-unsigned.ipa` e lo carica come artifact (30 giorni). |
 | `test-linux.yml` | push su ogni branch, PR, manuale | `swift test` su ogni package in `packages/`. |
+| `testflight.yml` | manuale, push su `main`, ogni ~60 giorni (1° dei mesi dispari) | archive firmato + export App Store + upload su TestFlight (vedi sotto). |
+
+Nota: `build-ipa.yml` firma ad-hoc l'app con `<App>.sideload.entitlements`
+se esiste (senza iCloud, che l'account gratuito non può firmare).
+
+### TestFlight (procedura riusabile per le altre app)
+
+Una volta per account (developer.apple.com / App Store Connect):
+
+1. App Store Connect › Utenti e accessi › Integrazioni › **chiave API** con
+   ruolo **Admin** (serve per creare certificati e profili e per la firma
+   cloud della distribuzione). Secrets della repo: `ASC_KEY_ID`,
+   `ASC_ISSUER_ID`, `ASC_KEY_P8` (testo del `.p8`, anche in base64),
+   `APPLE_TEAM_ID`.
+2. Per ogni app: scheda dell'app su App Store Connect con lo stesso bundle id
+   del `project.yml`. Gli App ID (app + `.widgets`) e i profili li
+   crea/aggiorna xcodebuild con `-allowProvisioningUpdates`, **ma l'API non
+   può assegnare App Group e container iCloud**: su developer.apple.com ›
+   Identifiers › ogni App ID (app **e** widget) › App Groups › *Configure* ›
+   spuntare `group.com.garoth93.<app>` (per l'app anche iCloud › *Configure* ›
+   il container). Altrimenti l'archive fallisce con "Provisioning profile …
+   doesn't match the entitlements file's value for …application-groups".
+   Lo step "App ID capabilities" del workflow stampa le capability attive.
+
+Nella repo:
+
+- copiare `.github/workflows/testflight.yml` e `scripts/asc_revoke_certs.py`,
+  cambiare `APP:` nell'env del workflow;
+- `project.yml`: firma vuota (la imposta il workflow da riga di comando:
+  `CODE_SIGN_STYLE=Automatic`, `CODE_SIGN_IDENTITY="Apple Development"`,
+  `DEVELOPMENT_TEAM`), `ITSAppUsesNonExemptEncryption: false` nell'Info.plist,
+  icona 1024 senza trasparenza, `MARKETING_VERSION` da alzare a mano per le
+  nuove versioni; se l'app è solo verticale serve `UIRequiresFullScreen: true`
+  (altrimenti l'upload è rifiutato con l'errore 90474 sulle orientazioni);
+- build number = `github.run_number` del workflow (sempre crescente).
+
+Come funziona: `xcodebuild archive` con firma automatica (crea al volo un
+certificato di sviluppo sul runner, poi revocato dallo step finale per non
+accumularli), `-exportArchive` con `method=app-store-connect`,
+`destination=upload` (firma di distribuzione gestita nel cloud da Apple e
+upload diretto). La build compare in TestFlight dopo 5-30 minuti di
+elaborazione. TestFlight fa scadere le build dopo 90 giorni: la schedulazione
+ogni due mesi le rinnova (gira sul branch di default della repo).
+Log di archive/export nell'artifact `testflight-logs`.
+
+
 
 ### Come leggere i log di CI
 

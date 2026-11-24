@@ -58,19 +58,23 @@ della serie: Ritorni, LTIDI, Home Alarm…).
 
 ## Installare l'app sull'iPhone
 
-1. Pagina **Actions** della repo › workflow **build-ipa** › ultimo run verde
-   (o **Run workflow**) › artifact `Valigia-unsigned-ipa`: estrai
-   `Valigia-unsigned.ipa` (resta disponibile 30 giorni).
-2. Sideloadly: collega l'iPhone, trascina il `.ipa`, inserisci l'Apple ID,
-   **Start**. Sull'iPhone: Impostazioni › Generali › VPN e gestione
-   dispositivo › Autorizza (serve anche la Modalità sviluppatore).
-3. Al primo avvio trovi i template di esempio: crea un viaggio con **+ Viaggio**.
+**TestFlight (consigliato).** A ogni push su `main` il workflow
+**testflight** firma l'app e la carica su App Store Connect: dopo 5-30 minuti
+la build compare nell'app TestFlight (gruppo di test interni). Ogni ~60 giorni
+il workflow ricostruisce da solo l'ultima versione, così la build non scade
+(TestFlight le fa scadere dopo 90 giorni). Si può lanciare anche a mano da
+**Actions › testflight › Run workflow**.
 
-Limiti dell'account gratuito: la firma scade dopo 7 giorni (rifirma lo stesso
-`.ipa`, i dati restano), massimo 3 app attive per Apple ID, app + widget usano
-2 identificativi. In Impostazioni › Informazioni la riga "Dati condivisi con i
-widget" dice se la firma ha incluso l'App Group: se è "Non disponibili" il
-widget resta vuoto. Fai un **backup JSON** prima di reinstallare.
+Configurazione una tantum (fatta): App ID `com.garoth93.valigia` (App Groups +
+iCloud) e `com.garoth93.valigia.widgets` (App Groups), App Group
+`group.com.garoth93.valigia`, container `iCloud.com.garoth93.backup`, scheda
+app su App Store Connect, secrets `APPLE_TEAM_ID`, `ASC_KEY_ID`,
+`ASC_ISSUER_ID`, `ASC_KEY_P8`.
+
+**Ripiego: Sideloadly.** Actions › **build-ipa** › artifact
+`Valigia-unsigned-ipa`, poi Sideloadly con l'Apple ID gratuito (firma di 7
+giorni, niente iCloud). In Impostazioni › Informazioni la riga "Dati condivisi
+con i widget" dice se la firma ha incluso l'App Group.
 
 ## Salvataggio
 

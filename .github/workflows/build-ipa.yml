@@ -84,8 +84,12 @@ jobs:
               codesign --force --sign - --timestamp=none "$appex"
             fi
           done
-          if [ -f "${{ matrix.app }}.entitlements" ]; then
-            codesign --force --sign - --timestamp=none --entitlements "${{ matrix.app }}.entitlements" "$PAYLOAD_APP"
+          # <App>.sideload.entitlements (when present) drops what a free
+          # account cannot sign, e.g. iCloud.
+          APP_ENT="${{ matrix.app }}.entitlements"
+          [ -f "${{ matrix.app }}.sideload.entitlements" ] && APP_ENT="${{ matrix.app }}.sideload.entitlements"
+          if [ -f "$APP_ENT" ]; then
+            codesign --force --sign - --timestamp=none --entitlements "$APP_ENT" "$PAYLOAD_APP"
           fi
           codesign -d --entitlements - --xml "$PAYLOAD_APP" 2>/dev/null | plutil -p - || true
           ls "$PAYLOAD_APP/PlugIns" 2>/dev/null || true

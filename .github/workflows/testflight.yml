@@ -1,0 +1,187 @@
+name: testflight
+
+# Signed archive + App Store export + upload to TestFlight.
+#
+# Signing is fully automatic: xcodebuild uses the App Store Connect API key
+# with -allowProvisioningUpdates to create/download the profiles (app +
+# widget, App Group, iCloud) and signs the export with a cloud-managed
+# distribution certificate. Nothing to keep in the repo or in the keychain.
+#
+# Repository secrets:
+#   ASC_KEY_ID      App Store Connect API key id (role: Admin)
+#   ASC_ISSUER_ID   Issuer ID (Users and Access › Integrations)
+#   ASC_KEY_P8      content of AuthKey_<id>.p8 (plain text or base64)
+#   APPLE_TEAM_ID   Team ID
+#
+# Build number = run number of this workflow (always increasing).
+# TestFlight builds expire after 90 days: a scheduled rebuild runs every
+# ~60 days (1st of odd months, 59-62 days apart) on the default branch.
+# build-ipa.yml (unsigned .ipa for Sideloadly) stays as fallback.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["apps/**", "packages/**", ".github/workflows/testflight.yml"]
+  schedule:
+    - cron: "17 4 1 */2 *"
+
+env:
+  XCODE_VERSION: "26.6"   # pinned; see CLAUDE.md "Xcode e runner"
+  APP: Valigia
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-xcode
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          app: ${{ env.APP }}
+
+      - name: Check secrets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=0
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Secret $v mancante"; missing=1; fi
+          done
+          exit $missing
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/private_keys"
+          mkdir -p "$dir"
+          key="$dir/AuthKey_${ASC_KEY_ID}.p8"
+          if printf '%s' "$ASC_KEY_P8" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_P8" > "$key"
+          else
+            printf '%s' "$ASC_KEY_P8" | base64 --decode > "$key"
+          fi
+          chmod 600 "$key"
+          grep -q "BEGIN PRIVATE KEY" "$key" || { echo "::error::ASC_KEY_P8 non è una chiave .p8 valida"; exit 1; }
+          echo "ASC_KEY_PATH=$key" >> "$GITHUB_ENV"
+
+      - name: App ID capabilities and stale profiles
+        continue-on-error: true
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          python3 -m pip install --quiet --break-system-packages "pyjwt[crypto]" 2>/dev/null || python3 -m pip install --quiet "pyjwt[crypto]"
+          python3 scripts/asc_bundle_ids.py --delete-stale --group group.com.garoth93.valigia com.garoth93.valigia com.garoth93.valigia.widgets
+
+      - name: Archive (automatic signing)
+        working-directory: apps/${{ env.APP }}
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild archive \
+            -project "$APP.xcodeproj" \
+            -scheme "$APP" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "build/$APP.xcarchive" \
+            -derivedDataPath build/DerivedData \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            | tee build/xcodebuild-archive.log | xcbeautify --renderer github-actions
+
+      - name: Export and upload to TestFlight
+        working-directory: apps/${{ env.APP }}
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > build/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>uploadSymbols</key><true/>
+            <key>testFlightInternalTestingOnly</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "build/$APP.xcarchive" \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tee build/xcodebuild-export.log | xcbeautify --renderer github-actions
+          echo "### TestFlight" >> "$GITHUB_STEP_SUMMARY"
+          echo "Caricata la build **${{ github.run_number }}** di $APP. Dopo l'elaborazione (5-30 minuti) compare in TestFlight." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show the provisioning profiles Xcode used (on failure)
+        if: failure()
+        run: |
+          for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            [ -d "$dir" ] || continue
+            for f in "$dir"/*; do
+              [ -f "$f" ] || continue
+              security cms -D -i "$f" > "$RUNNER_TEMP/p.plist" 2>/dev/null || continue
+              echo "== $(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/p.plist")"
+              /usr/libexec/PlistBuddy -c 'Print :Entitlements' "$RUNNER_TEMP/p.plist" | grep -v -E "keychain-access|get-task-allow|team-identifier" || true
+            done
+          done
+
+      - name: Revoke the development certificate created by this run
+        if: always()
+        continue-on-error: true
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          # Automatic signing creates an "Apple Development" certificate on this
+          # throw-away runner for the archive step: revoke it so they don't pile up.
+          security find-certificate -a -c "Apple Development" -p > "$RUNNER_TEMP/dev-certs.pem" 2>/dev/null || true
+          [ -s "$RUNNER_TEMP/dev-certs.pem" ] || { echo "Nessun certificato di sviluppo da revocare"; exit 0; }
+          python3 -m pip install --quiet --break-system-packages "pyjwt[crypto]" 2>/dev/null || python3 -m pip install --quiet "pyjwt[crypto]"
+          python3 scripts/asc_revoke_certs.py "$RUNNER_TEMP/dev-certs.pem"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: apps/${{ env.APP }}/build/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Cleanup API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/private_keys"
