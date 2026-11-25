@@ -57,8 +57,7 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         guard let s = response.notification.request.content.userInfo["tripID"] as? String,
               let id = UUID(uuidString: s) else { return }
         await MainActor.run {
-            AppModel.shared.tab = .trips
-            AppModel.shared.openTripID = id
+            AppModel.shared.openTrip(id)
         }
     }
 }

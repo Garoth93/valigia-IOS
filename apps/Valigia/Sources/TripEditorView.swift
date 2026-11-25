@@ -162,7 +162,7 @@ struct TripEditorView: View {
             if let newID {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(350))
-                    model.openTripID = newID
+                    model.openTrip(newID)
                 }
             }
         case .edit(let id):

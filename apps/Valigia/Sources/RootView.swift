@@ -9,7 +9,7 @@ struct RootView: View {
         @Bindable var model = model
         TabView(selection: $model.tab) {
             Tab("Viaggi", systemImage: "suitcase.rolling.fill", value: AppTab.trips) {
-                NavigationStack { TripsView() }
+                NavigationStack(path: $model.tripsPath) { TripsView() }
             }
             Tab("Template", systemImage: "square.stack.3d.up.fill", value: AppTab.templates) {
                 NavigationStack { TemplatesView() }
