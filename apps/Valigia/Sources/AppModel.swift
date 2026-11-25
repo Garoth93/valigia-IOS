@@ -75,8 +75,16 @@ final class AppModel {
     var toast: Toast?
     var errorMessage: String?
     var tab: AppTab = .trips
-    /// Trip to open (widget tap / notification / deep link).
-    var openTripID: UUID?
+    /// Navigation stack of the Viaggi tab. Opening a trip from code (new trip,
+    /// widget, notification, deep link) pushes its id here, so the trip and the
+    /// bags opened from it live in the same path.
+    var tripsPath = NavigationPath()
+
+    /// Shows a trip in the Viaggi tab, replacing whatever was open there.
+    func openTrip(_ id: UUID) {
+        tab = .trips
+        tripsPath = NavigationPath([id])
+    }
 
     let events = PackingEventCenter()
     private let writer: DataWriter
@@ -261,8 +269,7 @@ final class AppModel {
     func handle(url: URL) {
         guard url.scheme == "valigia" else { return }
         if url.host == "trip", let id = UUID(uuidString: url.lastPathComponent) {
-            tab = .trips
-            openTripID = id
+            openTrip(id)
         } else {
             tab = .trips
         }
