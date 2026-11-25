@@ -10,7 +10,6 @@ struct TripsView: View {
     @State private var toDelete: Trip?
 
     var body: some View {
-        @Bindable var model = model
         let now = Date()
         let sections = model.data.tripSections(now: now)
         let next = model.data.nextTrip(now: now)
@@ -77,9 +76,6 @@ struct TripsView: View {
         }
         .navigationDestination(for: ListRef.self) { ref in
             LuggageView(ref: ref)
-        }
-        .navigationDestination(item: $model.openTripID) { id in
-            TripDetailView(tripID: id)
         }
         .confirmationDialog("Eliminare il viaggio?", isPresented: Binding(get: { toDelete != nil }, set: { if !$0 { toDelete = nil } }), titleVisibility: .visible) {
             Button("Elimina \(toDelete?.name ?? "")", role: .destructive) {
